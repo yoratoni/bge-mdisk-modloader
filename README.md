@@ -9,11 +9,12 @@
 Early research phase, nothing usable for players yet. The goal is to make the 20th Anniversary Edition actually
 moddable, previous community tools stopped at extracting its files.
 
-The project is split in two components, built from the same sources:
-| Component            | Role                                                                                            |
-|----------------------|-------------------------------------------------------------------------------------------------|
-| `MDiskModLoader.asi` | The in-game toolbox (debugging and runtime injection), loaded by Ultimate ASI Loader            |
-| `MDiskPacker.exe`    | The repacker (planned), unpacks and repacks the game's `Data/Paks/*.pak` archives to apply mods |
+The project is split in packages, each one with its own `CMakeLists.txt`, sources, dependencies and tests:
+| Package           | Output                      | Role                                                                                               |
+|-------------------|-----------------------------|----------------------------------------------------------------------------------------------------|
+| `packages/asi`    | `MDiskModLoader.asi`        | The in-game toolbox (debugging and runtime injection), loaded by Ultimate ASI Loader, Windows only |
+| `packages/bpak`   | Library (planned)           | The `.pak` archive format (read, write, compression), shared by the other packages, portable       |
+| `packages/packer` | `MDiskPacker.exe` (planned) | The repacker, unpacks and repacks the game's `Data/Paks/*.pak` archives to apply mods, portable    |
 
 The name comes from the MDisks of the game, and from Mdisk, an extract/build tool for the original game's
 `sally_clean.bf` that got lost years ago.
@@ -42,7 +43,18 @@ cmake --build --preset release
 ctest --test-dir build --output-on-failure
 ```
 
-The version is defined once, in the `project()` call of `CMakeLists.txt`. Pushing a `vX.Y.Z` tag matching it builds,
+Every binary lands at the root of the build directory. Packages can be turned off when configuring:
+| Option              | Default         | Description                                       |
+|---------------------|-----------------|---------------------------------------------------|
+| `MDISK_BUILD_ASI`   | `ON` on Windows | Builds the in-game toolbox (`MDiskModLoader.asi`) |
+| `MDISK_BUILD_TESTS` | `ON`            | Builds the tests of every enabled package         |
+
+```bash
+# Configure without the ASI
+cmake --preset default -DMDISK_BUILD_ASI=OFF
+```
+
+The version is defined once, in the `project()` call of the root `CMakeLists.txt`, and shared by every package. Pushing a `vX.Y.Z` tag matching it builds,
 tests and publishes the release ZIP through the GitHub workflow.
 
 ## License

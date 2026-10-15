@@ -22,3 +22,12 @@ function(apply_compiler_flags target)
         target_compile_options(${target} PRIVATE $<$<CONFIG:Release>:-O3 -march=x86-64-v3>)
     endif()
 endfunction()
+
+# Enables LTO/IPO for the "Release" builds of a target, so the optimizer can inline across translation
+# unit boundaries (only when the root "CMakeLists.txt" found the toolchain supports it).
+# Usage: enable_release_ipo(<target>)
+function(enable_release_ipo target)
+    if(MDISK_IPO_SUPPORTED)
+        set_target_properties(${target} PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+    endif()
+endfunction()

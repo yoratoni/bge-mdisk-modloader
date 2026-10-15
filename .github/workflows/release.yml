@@ -40,7 +40,7 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $match = Select-String -Path CMakeLists.txt -Pattern 'project\(MDiskModLoader VERSION ([0-9.]+)'
+          $match = Select-String -Path CMakeLists.txt -Pattern 'project\(MDisk VERSION ([0-9.]+)'
           if (-not $match) {
               throw "Couldn't read the version from CMakeLists.txt"
           }

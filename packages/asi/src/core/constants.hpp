@@ -10,9 +10,9 @@ constexpr std::string_view MODLOADER_DISPLAY_NAME = "BG&E MDISK Mod Loader";
 
 /**
  * @brief The version of the mod loader, written at the top of the log, defined once in `CMakeLists.txt`
- * (`project(... VERSION ...)`) and passed as the `MODLOADER_VERSION_STRING` compile definition.
+ * (`project(... VERSION ...)`) and passed as the `MDISK_VERSION_STRING` compile definition.
  */
-constexpr std::string_view MODLOADER_VERSION = MODLOADER_VERSION_STRING;
+constexpr std::string_view MODLOADER_VERSION = MDISK_VERSION_STRING;
 
 /**
  * @brief The name of the game executable, the mod loader stays inactive inside any other process.
