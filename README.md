@@ -54,8 +54,38 @@ Every binary lands at the root of the build directory. Packages can be turned of
 cmake --preset default -DMDISK_BUILD_ASI=OFF
 ```
 
-The version is defined once, in the `project()` call of the root `CMakeLists.txt`, and shared by every package. Pushing a `vX.Y.Z` tag matching it builds,
-tests and publishes the release ZIP through the GitHub workflow.
+The version is defined once, in the `project()` call of the root `CMakeLists.txt`, and shared by every package.
+Pushing a `vX.Y.Z` tag matching it builds, tests and publishes the release ZIP through the GitHub workflow.
+
+## Research tools
+The Python scripts in `tools/` copy the game files into the `workspace/` folder (ignored by git) and unpack them
+layer by layer, every layer is made from the previous one:
+| Script                 | Output                             | Role                                                                                       |
+|------------------------|------------------------------------|--------------------------------------------------------------------------------------------|
+| `copy_game.py`         | `workspace/game/`                  | Copies the paks, `Config/` and `BigDir.jdproj` from the game folder (only what changed)    |
+| `unpack_1_bpak.py`     | `workspace/unpacked/1-bpak/`       | Unpacks every pak into its entries as stored and a `toc.json`                              |
+| `unpack_2_lz4.py`      | `workspace/unpacked/2-lz4/`        | Decompresses the entries of layer 1                                                        |
+| `unpack_3_identify.py` | `workspace/unpacked/3-identified/` | Sorts the entries of layer 2 into one folder per type (`unknown/` when not identified yet) |
+| `repack_1_bpak.py`     | `workspace/repacked/`              | Rebuilds the paks from layer 1 and checks they're byte-identical to the game's             |
+
+```bash
+# Once: the virtual environment (Python >= 3.10)
+python -m venv .venv
+.venv/Scripts/python -m pip install -r tools/requirements.txt
+
+# "--game <folder>" when the game isn't in the default Steam folder
+.venv/Scripts/python tools/copy_game.py
+
+# "--pak <pattern>" selects paks, e.g. "Text-*", already unpacked paks are skipped unless "--force" is passed
+.venv/Scripts/python tools/unpack_1_bpak.py
+.venv/Scripts/python tools/unpack_2_lz4.py
+.venv/Scripts/python tools/unpack_3_identify.py
+```
+
+Layer 3 hard links its files from layer 2 (no extra disk space), so editing a file in one layer edits it in both.
+Unpacking everything takes about 30 GiB on top of the 12 GiB copy.
+
+The scripts follow Pylint, configured in `pyproject.toml` (`.venv/Scripts/python -m pylint tools`).
 
 ## License
 Released under the [MIT License](LICENSE).

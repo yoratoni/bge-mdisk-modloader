@@ -55,3 +55,10 @@ backups/
 # Builds
 build/
 build-release/
+
+# Copy of the game files and unpacked layers (see "tools/")
+workspace/
+
+# Python
+__pycache__/
+.venv/

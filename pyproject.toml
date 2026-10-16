@@ -1,0 +1,4 @@
+# Settings of the Python tools (see "tools/"), not a package
+
+[tool.pylint.format]
+max-line-length = 120

@@ -15,18 +15,29 @@
     "clangd.checkUpdates": true,
     "clangd.onConfigChanged": "restart",
     "cSpell.words": [
+        "binarized",
         "BPAK",
         "choco",
         "DCMAKE",
         "Denuvo's",
         "dinput",
+        "IIIIQ",
         "ilammy",
         "jdproj",
         "lfanew",
         "MDISK",
+        "moddable",
+        "modloader",
+        "Paks",
         "pwsh",
+        "Rayman",
+        "repacker",
         "safetyhook",
         "softprops",
-        "tdst"
+        "steamapps",
+        "tdst",
+        "unbinarized",
+        "Zycore",
+        "Zydis"
     ]
 }
