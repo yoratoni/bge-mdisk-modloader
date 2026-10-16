@@ -13,15 +13,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from tools.bpak import Pak, PakEntry
-from tools.constants import (
-    BPAK_LAYER_DIR,
-    ENTRIES_DIR_NAME,
-    EXTRA_SUFFIX,
-    LZ4_SUFFIX,
-    PAKS_DIR,
-    TOC_FILE_NAME,
-    WORKER_THREADS,
-)
+from tools.constants import ENTRIES_DIR_NAME, EXTRA_SUFFIX, LZ4_SUFFIX, TOC_FILE_NAME, WORKER_THREADS
+from tools.paths import BPAK_LAYER_DIR, PAKS_DIR
 from tools.utils import format_size, write_toc
 
 

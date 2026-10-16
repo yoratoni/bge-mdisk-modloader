@@ -1,0 +1,11 @@
+# Local settings of the research tools ("tools/"), the paths that depend on the computer.
+# Copy this file to "mdisk.toml" (ignored by git) and adapt it, every setting is optional.
+# Single quotes keep backslashes as they are.
+
+# The game folder, the one containing "bge.exe" (on Steam: right-click the game, Manage, Browse local files),
+# "--game" overrides it
+game_dir = 'C:\Program Files (x86)\Steam\steamapps\common\Beyond Good and Evil - 20th Anniversary Edition'
+
+# The workspace, the copy of the game files and every unpacked layer (about 45 GiB), "workspace/" in the repository
+# when not set
+# workspace_dir = 'D:\MDiskWorkspace'

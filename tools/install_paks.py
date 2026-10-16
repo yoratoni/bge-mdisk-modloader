@@ -8,7 +8,7 @@ import argparse
 import shutil
 from pathlib import Path
 
-from tools.constants import BACKUPS_DIR, PAKS_RELATIVE_DIR, REPACKED_DIR
+from tools.paths import BACKUPS_DIR, PAKS_RELATIVE_DIR, REPACKED_DIR
 from tools.utils import add_game_argument, check_game_dir, format_size
 
 
@@ -51,7 +51,7 @@ def main() -> None:
     parser.add_argument("--restore", action="store_true", help="Restore the game's originals instead of installing")
     add_game_argument(parser)
     args = parser.parse_args()
-    check_game_dir(parser, args.game)
+    game_dir = check_game_dir(parser, args.game)
 
     if args.restore:
         backup_paths = sorted((BACKUPS_DIR / PAKS_RELATIVE_DIR).glob(f"{args.pak}.pak"))
@@ -60,7 +60,7 @@ def main() -> None:
             parser.error(f"no backed up pak matches {args.pak!r}, nothing to restore")
 
         for backup_path in backup_paths:
-            restore_pak(backup_path, args.game)
+            restore_pak(backup_path, game_dir)
     else:
         pak_paths = sorted(REPACKED_DIR.glob(f"{args.pak}.pak"))
 
@@ -70,7 +70,7 @@ def main() -> None:
             )
 
         for pak_path in pak_paths:
-            install_pak(pak_path, args.game)
+            install_pak(pak_path, game_dir)
 
 
 if __name__ == "__main__":

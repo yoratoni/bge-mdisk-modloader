@@ -8,7 +8,7 @@ import argparse
 import shutil
 from pathlib import Path
 
-from tools.constants import BACKUPS_DIR, GAME_COPY_DIR, GAME_ENTRIES
+from tools.paths import BACKUPS_DIR, GAME_COPY_DIR, GAME_ENTRIES
 from tools.utils import add_game_argument, check_game_dir, format_size
 
 
@@ -38,13 +38,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Copies the game files into workspace/game/")
     add_game_argument(parser)
     args = parser.parse_args()
-    check_game_dir(parser, args.game)
+    game_dir = check_game_dir(parser, args.game)
 
     copied_count = 0
     skipped_count = 0
 
     for entry in GAME_ENTRIES:
-        source = args.game / entry
+        source = game_dir / entry
 
         if source.is_file():
             files = [source]
@@ -52,7 +52,7 @@ def main() -> None:
             files = sorted(path for path in source.rglob("*") if path.is_file())
 
         for file in files:
-            relative_path = file.relative_to(args.game)
+            relative_path = file.relative_to(game_dir)
             destination = GAME_COPY_DIR / relative_path
 
             # A file replaced by "tools.install_paks" is copied from its backup, the game's original

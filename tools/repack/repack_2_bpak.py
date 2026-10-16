@@ -13,16 +13,14 @@ from pathlib import Path
 from tools.bpak import PakEntry, PakHeader, align, serialize_table
 from tools.constants import (
     BPAK_HEADER,
-    BPAK_LAYER_DIR,
     BPAK_MAGIC,
     BPAK_PADDING_BYTE,
     ENTRIES_DIR_NAME,
     EXTRA_SUFFIX,
     IO_BUFFER_SIZE,
-    PAKS_DIR,
-    REPACKED_DIR,
     TOC_FILE_NAME,
 )
+from tools.paths import BPAK_LAYER_DIR, PAKS_DIR, REPACKED_DIR
 from tools.utils import read_toc, select_layer_paks
 
 

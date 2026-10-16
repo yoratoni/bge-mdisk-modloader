@@ -6,29 +6,44 @@ from pathlib import Path
 from typing import Any
 
 from tools.bpak import PakEntry, PakHeader
-from tools.constants import DEFAULT_GAME_DIR, GAME_EXECUTABLE_NAME, TOC_FILE_NAME
+from tools.constants import GAME_EXECUTABLE_NAME, INDEX_FILE_NAME, TOC_FILE_NAME
+from tools.paths import GAME_DIR, IDENTIFIED_LAYER_DIR, SETTINGS_EXAMPLE_PATH, SETTINGS_PATH
 
 
 def add_game_argument(parser: argparse.ArgumentParser) -> None:
-    """Adds the "--game" argument, the game folder (the default Steam folder when not given).
+    """Adds the "--game" argument, the game folder (the one of the local settings when not given).
 
     Args:
         parser: The argument parser of the tool.
     """
     parser.add_argument(
-        "--game", type=Path, default=DEFAULT_GAME_DIR, help=f"The game folder (containing {GAME_EXECUTABLE_NAME})"
+        "--game",
+        type=Path,
+        default=GAME_DIR,
+        help=f"The game folder (containing {GAME_EXECUTABLE_NAME}), default: game_dir in {SETTINGS_PATH.name}",
     )
 
 
-def check_game_dir(parser: argparse.ArgumentParser, game_dir: Path) -> None:
-    """Exits with a usage error when a folder isn't the game folder.
+def check_game_dir(parser: argparse.ArgumentParser, game_dir: Path | None) -> Path:
+    """Exits with a usage error when there's no game folder or when it isn't the game folder.
 
     Args:
         parser: The argument parser of the tool.
-        game_dir: The folder given with "--game".
+        game_dir: The folder given with "--game", None when neither it nor the local settings give one.
+
+    Returns:
+        The game folder.
     """
+    if game_dir is None:
+        parser.error(
+            f"no game folder, set game_dir in {SETTINGS_PATH.name} (start from {SETTINGS_EXAMPLE_PATH.name}) "
+            "or pass --game"
+        )
+
     if not (game_dir / GAME_EXECUTABLE_NAME).is_file():
         parser.error(f"{GAME_EXECUTABLE_NAME} not found in {game_dir}")
+
+    return game_dir
 
 
 def select_layer_paks(parser: argparse.ArgumentParser, layer_dir: Path, pattern: str, producer: str) -> list[Path]:
@@ -132,3 +147,24 @@ def read_toc(path: Path) -> tuple[PakHeader, list[PakEntry], list[str]]:
     ]
 
     return header, entries, [item["file"] for item in toc["entries"]]
+
+
+def read_identified_types() -> dict[str, tuple[str, str]]:
+    """Reads the type layer 3 identified for the entries of every pak.
+
+    An entry name or key present in several paks (e.g. the same text key in two languages) keeps the first pak in
+    name order.
+
+    Returns:
+        The pak name and the type of every entry, by its file name in layer 2 (the entry name, or the key as 8
+        lowercase hex digits).
+    """
+    identified_types: dict[str, tuple[str, str]] = {}
+
+    for index_path in sorted(IDENTIFIED_LAYER_DIR.glob(f"*/{INDEX_FILE_NAME}")):
+        index = json.loads(index_path.read_text(encoding="utf-8"))
+
+        for file_name, item in index.items():
+            identified_types.setdefault(file_name, (index_path.parent.name, item["type"]))
+
+    return identified_types

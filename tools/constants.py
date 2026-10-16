@@ -1,61 +1,19 @@
-"""Every constant of the tools: paths, layer files, performance settings, the BPAK format and the identification rules.
+"""Every constant of the tools that isn't a location (see "tools/paths.py" for those): layer files, performance
+settings, the BPAK format, the identification rules and the load trace.
 
-The BPAK format is documented in "docs/RESEARCH.md".
+The BPAK format and the load trace are documented in "docs/RESEARCH.md".
 """
 
 import re
 import struct
-from pathlib import Path
 from typing import Final
+
+from tools.load_trace import LoaderCallback
 
 # region Game
 
-# The default game folder (Steam), overridable with "--game"
-DEFAULT_GAME_DIR = Path(r"F:\SteamLibrary\steamapps\common\Beyond Good and Evil - 20th Anniversary Edition")
-
 # The game executable, used to check that "--game" points at the game folder
 GAME_EXECUTABLE_NAME = "bge.exe"
-
-# The files and folders copied from the game folder ("Data/Movies" is left out, the Bink movies are loose files
-# with nothing to unpack)
-GAME_ENTRIES = ("Config", "Data/BigDir.jdproj", "Data/Paks")
-
-# The folder holding the paks, relative to the game folder
-PAKS_RELATIVE_DIR = Path("Data") / "Paks"
-
-# endregion
-
-# region Workspace
-
-# The repository root, every other path is derived from it
-REPO_DIR = Path(__file__).resolve().parent.parent
-
-# Ignored by git, holds the copy of the game files and every unpacked layer
-WORKSPACE_DIR = REPO_DIR / "workspace"
-
-# The copy of the game files the tools work on, mirroring the game folder layout (the game install is never touched)
-GAME_COPY_DIR = WORKSPACE_DIR / "game"
-
-# The copy of the pak archives
-PAKS_DIR = GAME_COPY_DIR / PAKS_RELATIVE_DIR
-
-# The unpacked layers, each one is made from the previous one
-UNPACKED_DIR = WORKSPACE_DIR / "unpacked"
-
-# Layer 1: the entries of every pak as stored (LZ4 blocks or raw) and their table of contents
-BPAK_LAYER_DIR = UNPACKED_DIR / "1-bpak"
-
-# Layer 2: the entries of layer 1 decompressed
-LZ4_LAYER_DIR = UNPACKED_DIR / "2-lz4"
-
-# Layer 3: the entries of layer 2 sorted by type
-IDENTIFIED_LAYER_DIR = UNPACKED_DIR / "3-identified"
-
-# The paks rebuilt from layer 1, to check it holds everything or to install them in the game
-REPACKED_DIR = WORKSPACE_DIR / "repacked"
-
-# The game's original files replaced by "tools.install_paks", mirroring the game folder layout
-BACKUPS_DIR = WORKSPACE_DIR / "backups"
 
 # endregion
 
@@ -133,8 +91,112 @@ PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 TEXTURE_TABLE_NAME = "texParamTable"
 TEXTURE_RECORD = struct.Struct("<I60x")
 
+# The extensions of Jade files (Ray1Map's "Jade_FileType" and Jaded's loaders), the reference lists store one after
+# every key they reference ([uint32 key][".gao"])
+JADE_EXTENSIONS = (
+    "act",
+    "cin",
+    "cob",
+    "fce",
+    "gao",
+    "gri",
+    "grm",
+    "gro",
+    "lrl",
+    "map",
+    "msk",
+    "ofc",
+    "oin",
+    "omd",
+    "ova",
+    "pal",
+    "smd",
+    "snk",
+    "trl",
+    "ttt",
+    "txg",
+    "txi",
+    "txl",
+    "txs",
+    "txt",
+    "waa",
+    "wac",
+    "wad",
+    "wam",
+    "wav",
+    "wol",
+    "wow",
+)
+
+# A reference to another entry, a Jade extension preceded by the key of the entry it points at (4 bytes)
+JADE_REFERENCE_PATTERN = re.compile(rb"\.(" + b"|".join(extension.encode() for extension in JADE_EXTENSIONS) + rb")")
+JADE_REFERENCE_KEY_SIZE = 4
+
+# The entries scanned for references, the reference lists are small (the biggest seen is 7 KiB), the big entries
+# (meshes, textures) hold none
+REFERENCE_SCAN_MAX_SIZE = 256 * 1024
+
 # The types of the entries that can't be identified and of the entries without data
 UNKNOWN_TYPE = "unknown"
 EMPTY_TYPE = "empty"
+
+# endregion
+
+# region Load trace
+
+# The trace the ASI writes next to the game executable ("[Debug] TraceLoads"), truncated at every game start
+LOAD_TRACE_FILE_NAME = "MDiskModLoader.loads.tsv"
+
+# A collected trace is named after the time its game session wrote it last (e.g. "2026-10-16-143712.loads.tsv")
+TRACE_TIME_FORMAT = "%Y-%m-%d-%H%M%S"
+TRACE_SUFFIX = ".loads.tsv"
+
+# The loader callbacks identified so far, by RVA in "bge.exe" (Aug 2 2024 build), from the order of their requests
+# matched with Jade's "LOA_MakeFileRef" calls and the offsets of their children's keys (see "docs/RESEARCH.md")
+LOADER_CALLBACKS: Final[dict[int, LoaderCallback]] = {
+    # World
+    0x9B6150: LoaderCallback("WOR_ul_World_LoadCallback", "world", "wow"),
+    0x9B5FA0: LoaderCallback("WOR_ul_GameObjectGroupCallback", "world object list", "gol"),
+    0x9E9E60: LoaderCallback("GRID_ul_CallbackWorldGrid", "grid", "gri"),
+    0x9E9CC0: LoaderCallback("GRID_ul_CallbackCompressedGrid", "compressed grid", None),
+    0x9E4C40: LoaderCallback("WAY_ul_AllNetWorksCallback", "network list", None),
+    0x9E4AF0: LoaderCallback("WAY_ul_NetWorkCallback", "network", None),
+    # Game objects
+    0x9EA250: LoaderCallback("OBJ_ul_GameObjectCallback", "game object", "gao"),
+    0xA39860: LoaderCallback("GEO_ul_Load_ObjectCallback", "graphic object or material", None),
+    0x9ED490: LoaderCallback("GRP_ul_LoadGrpCallback", "group", "grp"),
+    0x9ED200: LoaderCallback("OBJ_ul_World_LoadGolCallback", "object list", "gol"),
+    0x9E47B0: LoaderCallback("WAY_ul_AllLinkListsCallback", "link lists", None),
+    # Sound, the banks list their sounds ([key][".snk"], [key][".smd"]) but the PC plays Wwise, they're never loaded
+    0xAFDDA0: LoaderCallback("SND_ul_CallbackUnknownBank", "sound bank", None),
+    # AI
+    0xB40340: LoaderCallback("AI_ul_CallbackLoadInstance", "AI instance", "oin"),
+    0xB3E8E0: LoaderCallback("AI_ul_CallbackLoadModel", "AI model", "omd"),
+    0xB3EB90: LoaderCallback("AI_ul_CallbackLoadVars", "AI variables", "ova"),
+    0xB3F520: LoaderCallback("AI_ul_CallbackLoadFunction", "AI function", "ofc"),
+    # Animation
+    0x9BD970: LoaderCallback("ACT_ul_ActionKitCallback", "action kit", None),
+    0x9BDBC0: LoaderCallback("ACT_ul_ActionCallback", "action", "act"),
+    0xB442C0: LoaderCallback("EVE_ul_CallbackLoadListTracks", "event tracks", "trl"),
+    0x9BEEF0: LoaderCallback("ANI_ul_ShapeCallback", "shape", None),
+    # Collision
+    0x9E7A50: LoaderCallback("COL_ul_CallBackLoadInstance", "collision instance", "cin"),
+    0x9E7F30: LoaderCallback("COL_ul_CallBackLoadColSet", "collision set", None),
+    0x9E82D0: LoaderCallback("COL_ul_CallBackLoadColMap", "collision map", "map"),
+    0x9E8540: LoaderCallback("COL_ul_CallBackLoadCob", "collision object", "cob"),
+    0x9E8E50: LoaderCallback("COL_ul_CallBackLoadGameMaterial", "collision game materials", None),
+    # Text (no Jade name, BG&E's text system differs from Jaded's), a group holds 13 entries of 16 bytes,
+    # one per language, with the keys of its ids and strings
+    0x9BFAC0: LoaderCallback(None, "text group list", None),
+    0x9BFC80: LoaderCallback(None, "text group", "txg"),
+    0x9C0070: LoaderCallback(None, "text ids", "txi"),
+    0x9BFFD0: LoaderCallback(None, "text strings", "txs"),
+}
+
+# The bytes shown from the start of the files a callback loads, to compare their headers
+CALLBACK_HEAD_SIZE = 4
+
+# The number of values shown per histogram in the callback report
+CALLBACK_REPORT_TOP_COUNT = 4
 
 # endregion

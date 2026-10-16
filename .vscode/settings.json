@@ -14,13 +14,17 @@
     // clangd >= 20 and a stale binary fails loudly inside the MSVC STL rather than degrading
     "clangd.checkUpdates": true,
     "clangd.onConfigChanged": "restart",
+    // Addresses written as "+RVA" in the research notes (e.g. "+AEAC00")
+    "cSpell.ignoreRegExpList": ["\\+[0-9A-F]{4,}\\b"],
     "cSpell.words": [
         "binarized",
         "BPAK",
+        "cgro",
         "choco",
         "DCMAKE",
         "Denuvo's",
         "dinput",
+        "gast",
         "IIIIQ",
         "ilammy",
         "jdproj",
@@ -29,14 +33,17 @@
         "moddable",
         "modloader",
         "Paks",
+        "partie",
         "pwsh",
         "Rayman",
         "repacker",
+        "rodata",
         "safetyhook",
         "softprops",
         "steamapps",
         "tdst",
         "unbinarized",
+        "Wwise",
         "Zycore",
         "Zydis"
     ]

@@ -59,6 +59,9 @@ build-release/
 # Copy of the game files and unpacked layers (see "tools/")
 workspace/
 
+# Local settings of the tools (see "mdisk.example.toml")
+mdisk.toml
+
 # Python
 __pycache__/
 .venv/

@@ -10,10 +10,11 @@ findings (aspect ratio, cameras, FOV) live in the widescreen fix's own `docs/RES
 1. [The build](#the-build)
 2. [Protection and injection](#protection-and-injection)
 3. [Data layout](#data-layout)
-4. [Engine file layer](#engine-file-layer)
-5. [Prior art](#prior-art)
-6. [Open questions](#open-questions)
-7. [Method and tooling](#method-and-tooling)
+4. [Modding results](#modding-results)
+5. [Engine file layer](#engine-file-layer)
+6. [Prior art](#prior-art)
+7. [Open questions](#open-questions)
+8. [Method and tooling](#method-and-tooling)
 
 ## The build
 | Property   | Value                                                                                          |
@@ -113,23 +114,33 @@ Jade files can start with a 4-character type tag (Ray1Map's `Jade_FileType`: `.g
 engine knows the type of every other key from the reference it follows, so typing the rest requires walking the
 references from the universe key (`0x71003FF9`) and parsing every format on the way.
 
-What `tools.unpack.unpack_3_identify` can identify with certainty in `Resources.pak`:
-| Type    | Entries | How                                                                                                                       |
-|---------|---------|---------------------------------------------------------------------------------------------------------------------------|
-| `.gao`  | 70,828  | Game objects, tag at offset 0                                                                                             |
-| `.cgro` | 11,071  | Named `<decimal key>.cgro`, every one matches an existing key, likely the remaster's compiled version of a graphic object |
-| `.wav`  | 8,840   | RIFF WAVE, all XMA2 (`0x166`), mostly 32 kHz mono: the original Jade sounds in their Xbox format, the PC plays Wwise      |
-| `.tex`  | 3,700   | Listed in `texParamTable`, they start with `0E 00 0x 00` (16 with `00 00 02 00`)                                          |
-| `.wow`  | 637     | Worlds, tag at offset 0, the world name at `+0x10`                                                                        |
-| `.png`  | 15      | PNG signature                                                                                                             |
-| Empty   | 750     | No data                                                                                                                   |
-| Unknown | 139,536 | 59% of the pak, including 37,772 entries of 8 bytes holding two keys, the second being the entry's own key minus 1        |
+What `tools.unpack.unpack_3_identify` identifies in `Resources.pak` (235,378 entries), by rule, with the two load
+traces of 2026-10-16 (73 worlds visited):
+| Rule          | Entries         | Types                                                                                                                                           |
+|---------------|-----------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
+| Jade tag      | 71,465 (30.4%)  | `.gao` 70,828 (game objects), `.wow` 637 (worlds, the world name at `+0x10`)                                                                    |
+| Load trace    | 16,693 (7.1%)   | Graphic objects or materials 5,922, `.oin` 2,490, `.ova` 2,490, `.trl` 1,305, link lists 946, `.map` 772, `.cob` 565, `.gol` 476, ...           |
+| Name          | 11,072 (4.7%)   | `.cgro` 11,071 (named `<decimal key>.cgro`, every one matches an existing key, likely the remaster's compiled graphic objects), `texParamTable` |
+| RIFF header   | 8,840 (3.8%)    | `.wav`, all XMA2 (`0x166`), mostly 32 kHz mono: the original Jade sounds in their Xbox format, the PC plays Wwise                               |
+| Reference     | 8,396 (3.6%)    | `.ofc` 3,502, `.act` 2,107, `.snk` 1,008, `.smd` 966, `.ova` 678, `.txg` 132, ...                                                               |
+| Texture table | 3,700 (1.6%)    | `.tex`, listed in `texParamTable`, they start with `0E 00 0x 00` (16 with `00 00 02 00`)                                                        |
+| Empty         | 750 (0.3%)      | No data                                                                                                                                         |
+| PNG signature | 15              | `.png`                                                                                                                                          |
+| Unknown       | 114,447 (48.6%) | Down from 139,536 before the references and the load traces, every new trace types more                                                         |
+
+The 37,772 entries of 8 bytes holding two keys are mostly AI instances (`.oin`, a model key then a variables key),
+the traces typed 2,490 of them. A structural rule (two keys, an AI model then AI variables) could type the others.
 
 `texParamTable` is an array of 3,700 records of 64 bytes, one per texture: the texture key first, then fields
 framed by the `0xCAD01234` (`+0x20`) and `0xC0DEC0DE` (`+0x30`) markers of the original Jade texture headers.
 
 The extra bytes are INI sections: `[Base]` on textures (2,666), `FogDensity=` on lights (3,307), `[Performance]`
 (107), `[Procedural]` (36) and `[Anniversary]` (8).
+
+**Reference lists**: Jade's lists store every reference as `[uint32 key][".ext"]`, the key followed by the extension
+of the file it points at (object lists, action kits, AI models, sound banks, text group lists, ...). 4,911 entries of
+`Resources.pak` hold such records, they give an extension to 64,977 keys (a single key gets two different ones).
+Layer 3 uses them, along with the types of the [loader callbacks](#loader-callbacks) of the collected load traces.
 
 ### BigDir
 `Data/BigDir.jdproj` ships with the retail game:
@@ -144,6 +155,19 @@ BigDirIgnore=*.hlsl,ROOT\BigDir___locked__.w,ROOT\EngineDatas\04 Technical Bank\
 "BigDir" looks like the editor's unpacked form of the BIG file, a folder tree (`ROOT\EngineDatas\...`) instead of an
 archive, with file names formatted by `"%s%s.%08x.%s"` (name, key, extension). Whether the retail exe can still load
 from a BigDir is one of the most valuable open questions.
+
+## Modding results
+In-game tests of edited paks, rebuilt with the tools (the edited entries recompressed with LZ4 high compression, so
+the rebuilt paks differ in size from the originals):
+| Date       | Pak              | Change                                                                    | Result                                                            |
+|------------|------------------|---------------------------------------------------------------------------|-------------------------------------------------------------------|
+| 2026-10-16 | `Text-fr.pak`    | `Nouvelle partie` → `MDISK ca marche` in entry `0x4900FDCA` (same length) | Shown in the main menu                                            |
+| 2026-10-16 | `Text-en_US.pak` | `New Game` → `MDISK!!!` in entry `0x4900FDC6` (same length)               | Rebuilt and installed with the French one, not checked in English |
+| 2026-10-16 | `Engine.pak`     | `FramePerf=0` → `1` in `BGE.ini`                                          | No FPS counter                                                    |
+
+**The paks aren't checked**: a rebuilt pak with a recompressed entry and a different size loads, editing the paks
+in place works. The FPS counter result is inconclusive, either it's compiled out of the retail exe or that `BGE.ini`
+isn't the one that wins (`BGE.player.ini` is read after it), to check with a setting that's always visible.
 
 ## Engine file layer
 Leads only, nothing confirmed at runtime yet:
@@ -165,6 +189,78 @@ Leads only, nothing confirmed at runtime yet:
 
 `"Key does not exists (%x)"` suggests assets are still looked up by 32-bit key at some level.
 
+### The reference resolver (`LOA_Resolve`)
+Found from the only reference to `"Key does not exists (%x)"`, and nearly unchanged from Jade's `LOA_Resolve` (see
+Jaded's `LOAdefs.c`). Every file the engine loads goes through it: code that needs a file queues a reference (key,
+where to store the result, a **loader callback** specific to the file type, flags), then the resolver walks the
+queue and calls the callback of every reference whose file isn't loaded yet:
+| RVA        | What                                                                                                      |
+|------------|-----------------------------------------------------------------------------------------------------------|
+| `+AD68E0`  | `LOA_Resolve`, the loop over the queue                                                                    |
+| `+210E1F0` | The queue (Jade's `LOA_gast_Stack`), 5,000 slots (`LOA_C_MaxStack`, `0x1388`) of 32 bytes                 |
+| `+20A2700` | The slot being resolved (`LOA_gi_CurRef`)                                                                 |
+| `+20A2704` | The next free slot (`LOA_gi_LastRef`)                                                                     |
+| `+AEAC00`  | Hash lookup, called twice: key to file position, then file position to already loaded data (`-1` if none) |
+| `+AD69CB`  | `call qword ptr [rbx + 0x10]`, the loader callback, receives the file position in `ecx`                   |
+| `+AD6A8B`  | The error path, a missing key whose reference has the "must exist" flag (`LOA_C_MustExists`, bit 0)       |
+
+A queue slot (Jade's `LOA_tdst_Ref`):
+| Offset  | Type     | Field                                                                                      |
+|---------|----------|--------------------------------------------------------------------------------------------|
+| `+0x00` | `uint32` | Key                                                                                        |
+| `+0x08` | `void**` | Where to store the loaded data                                                             |
+| `+0x10` | `void*`  | Loader callback, `ULONG callback(ULONG position)`, one per file type                       |
+| `+0x18` | `uint8`  | Flags (`0x01` must exist, `0x04` don't save the pointer, `0x08` temporary allocation, ...) |
+
+Queueing a reference (`_LOA_MakeFileRef`) is inlined in every caller in this build, there's no single function to
+hook. The mod loader's load trace (`[Debug] TraceLoads`) hooks the resolver instead, right after the loaded data
+lookup and right after the callback returns: the references queued while a callback runs are the children of its
+file, so the trace records every key with its loader callback (its type) and the key that referenced it.
+
+Only 13 source file paths are left in `.rodata` (`BIGfiles`, audio, `INOut`, `STRing`, `BASe`, `COLlision`), the
+asserts that named the callbacks' source files are stripped, the callbacks get named from the types of the keys
+they load instead.
+
+### Loader callbacks
+Named from the first load trace (2026-10-16, a few levels: 13,696 rows, 8,988 keys, 29 callbacks) with
+`tools.trace.analyze_callbacks`. The trace keeps the order in which every loader requests its children, which is
+the order of its `LOA_MakeFileRef` calls in the Jaded source, and the keys of the children are found at fixed
+offsets of the parent files (the fields of the formats that hold references):
+| RVA       | Jade callback                     | Loads                       | Evidence                                                                                                                                 |
+|-----------|-----------------------------------|-----------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| `+9B6150` | `WOR_ul_World_LoadCallback`       | World (`.wow`)              | `.wow` tag, requests a grid twice, the object list, the networks (Jaded's order), keys at `+0xD0`, `+0xD4`, `+0xD8`                      |
+| `+9B5FA0` | `WOR_ul_GameObjectGroupCallback`  | World object list           | `[key][".gao"]` records                                                                                                                  |
+| `+9E9E60` | `GRID_ul_CallbackWorldGrid`       | Grid (`.gri`)               | Compressed grid key at `+0x8`                                                                                                            |
+| `+9E9CC0` | `GRID_ul_CallbackCompressedGrid`  | Compressed grid             | Requested by the grid                                                                                                                    |
+| `+9E4C40` | `WAY_ul_AllNetWorksCallback`      | Network list                | Last request of the world                                                                                                                |
+| `+9E4AF0` | `WAY_ul_NetWorkCallback`          | Network                     | Root object key at `+0x0`                                                                                                                |
+| `+9EA250` | `OBJ_ul_GameObjectCallback`       | Game object (`.gao`)        | `.gao` tag                                                                                                                               |
+| `+A39860` | `GEO_ul_Load_ObjectCallback`      | Graphic object or material  | The first two requests of an object (visual, material), multi-materials request their sub-materials                                      |
+| `+9ED490` | `GRP_ul_LoadGrpCallback`          | Group (`.grp`)              | Object list key at `+0x0` in 113 of 113 (Jaded's `GRPload.c` reads it first)                                                             |
+| `+9ED200` | `OBJ_ul_World_LoadGolCallback`    | Object list (`.gol`)        | `[key][".gao"]` records                                                                                                                  |
+| `+9E47B0` | `WAY_ul_AllLinkListsCallback`     | Link lists                  | Requests a network, then objects                                                                                                         |
+| `+AFDDA0` | `SND_ul_CallbackUnknownBank`      | Sound bank                  | `[key][".snk"]`, `[key][".smd"]` records, between the AI and the collisions in an object's requests, never followed (the PC plays Wwise) |
+| `+B40340` | `AI_ul_CallbackLoadInstance`      | AI instance (`.oin`)        | 8-byte files, model key at `+0x0` and variables key at `+0x4` in 603 of 603                                                              |
+| `+B3E8E0` | `AI_ul_CallbackLoadModel`         | AI model (`.omd`)           | Requests its variables, then its functions (Jaded's order)                                                                               |
+| `+B3EB90` | `AI_ul_CallbackLoadVars`          | AI variables (`.ova`)       | Requests its init functions                                                                                                              |
+| `+B3F520` | `AI_ul_CallbackLoadFunction`      | AI function (`.ofc`)        | Requested by models and variables                                                                                                        |
+| `+9BD970` | `ACT_ul_ActionKitCallback`        | Action kit                  | `[key][".act"]` records                                                                                                                  |
+| `+9BDBC0` | `ACT_ul_ActionCallback`           | Action (`.act`)             | Event tracks at `+0x4`, then shape at `+0xC` (Jaded's order)                                                                             |
+| `+B442C0` | `EVE_ul_CallbackLoadListTracks`   | Event tracks (`.trl`)       | Requested by actions and objects, request the objects of their tracks                                                                    |
+| `+9BEEF0` | `ANI_ul_ShapeCallback`            | Shape                       | Second request of an action                                                                                                              |
+| `+9E7A50` | `COL_ul_CallBackLoadInstance`     | Collision instance (`.cin`) | Collision set key at `+0x0`                                                                                                              |
+| `+9E7F30` | `COL_ul_CallBackLoadColSet`       | Collision set               | Requested by the collision instance                                                                                                      |
+| `+9E82D0` | `COL_ul_CallBackLoadColMap`       | Collision map (`.map`)      | Collision object key at `+0x4`                                                                                                           |
+| `+9E8540` | `COL_ul_CallBackLoadCob`          | Collision object (`.cob`)   | Game materials key at `+0x0`                                                                                                             |
+| `+9E8E50` | `COL_ul_CallBackLoadGameMaterial` | Collision game materials    | A single file for the whole game, requested 120 times                                                                                    |
+| `+9BFAC0` | No Jaded counterpart              | Text group list             | `[key][".txg"]` records, requested by top-level code                                                                                     |
+| `+9BFC80` | No Jaded counterpart              | Text group (`.txg`)         | 208 bytes, 13 entries of 16 bytes (one per language), ids key at `+0x0`, strings key at `+0x8`                                           |
+| `+9C0070` | No Jaded counterpart              | Text ids (`.txi`)           | First key of a text group entry                                                                                                          |
+| `+9BFFD0` | No Jaded counterpart              | Text strings (`.txs`)       | Second key of a text group entry, `\p16\...` text markup                                                                                 |
+
+No texture goes through the resolver: Jade's materials reference textures by index into a global texture list,
+loaded separately, which matches the remaster's `texParamTable`.
+
 ## Prior art
 | Tool                                                                                  | Author           | Target                                                 | Scope and status                                                                                                                            |
 |---------------------------------------------------------------------------------------|------------------|--------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
@@ -184,9 +280,9 @@ Community references: [ResHax BPAK thread](https://reshax.com/topic/845-beyond-g
 The survey, every answer goes into this document:
 1. **BPAK**: solved (see [BPAK format](#bpak-format)), except the meaning of the three unknown header fields and of
    the constant unknown entry field.
-2. **Pak mounting**: how `Data/Paks/` files are enumerated (hard-coded list, directory scan, language suffix),
-   whether an extra pak can be mounted with priority (Ray1Map names the header field at `0x08` "priority"), and
-   whether anything checks the paks (hash, CRC, size).
+2. **Pak mounting**: how `Data/Paks/` files are enumerated (hard-coded list, directory scan, language suffix) and
+   whether an extra pak can be mounted with priority (Ray1Map names the header field at `0x08` "priority"). Nothing
+   checks the paks (see [Modding results](#modding-results)).
 3. **Lookup path**: table of contents parsing, name or key to entry, read and decompress, and how `BIG_Read` /
    `LOA` sit on top. Settles keys vs CRC names.
 4. **BigDir**: whether loading loose files is reachable in retail.
@@ -195,8 +291,8 @@ The survey, every answer goes into this document:
    replacing or adding an asset means (keys referenced inside other assets).
 6. **Other channels**: Wwise IO, shaders, Bink movies, `Config/*.spe`, `BGE_Build.ini` switches, AI2C scripts vs a
    remaining AI interpreter.
-7. **Injection strategy**: rank patching paks in place, a mod pak mounted by the ASI, and loose files redirected
-   by the ASI.
+7. **Injection strategy**: patching the paks in place works (see [Modding results](#modding-results)), rank it
+   against a mod pak mounted by the ASI and loose files redirected by the ASI, which leave the game files untouched.
 
 ## Method and tooling
 - Static analysis: Python with `pefile` (PE headers, sections) and `capstone` (disassembly), strings and their

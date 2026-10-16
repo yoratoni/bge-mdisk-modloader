@@ -13,7 +13,8 @@ from pathlib import Path
 
 import lz4.block
 
-from tools.constants import BPAK_LAYER_DIR, ENTRIES_DIR_NAME, EXTRA_SUFFIX, LZ4_LAYER_DIR, TOC_FILE_NAME, WORKER_THREADS
+from tools.constants import ENTRIES_DIR_NAME, EXTRA_SUFFIX, TOC_FILE_NAME, WORKER_THREADS
+from tools.paths import BPAK_LAYER_DIR, LZ4_LAYER_DIR
 from tools.utils import format_size, read_toc, select_layer_paks, write_toc
 
 
