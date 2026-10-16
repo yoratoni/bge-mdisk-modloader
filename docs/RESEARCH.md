@@ -116,20 +116,30 @@ references from the universe key (`0x71003FF9`) and parsing every format on the 
 
 What `tools.unpack.unpack_3_identify` identifies in `Resources.pak` (235,378 entries), by rule, with the two load
 traces of 2026-10-16 (73 worlds visited):
-| Rule          | Entries         | Types                                                                                                                                           |
-|---------------|-----------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
-| Jade tag      | 71,465 (30.4%)  | `.gao` 70,828 (game objects), `.wow` 637 (worlds, the world name at `+0x10`)                                                                    |
-| Load trace    | 16,693 (7.1%)   | Graphic objects or materials 5,922, `.oin` 2,490, `.ova` 2,490, `.trl` 1,305, link lists 946, `.map` 772, `.cob` 565, `.gol` 476, ...           |
-| Name          | 11,072 (4.7%)   | `.cgro` 11,071 (named `<decimal key>.cgro`, every one matches an existing key, likely the remaster's compiled graphic objects), `texParamTable` |
-| RIFF header   | 8,840 (3.8%)    | `.wav`, all XMA2 (`0x166`), mostly 32 kHz mono: the original Jade sounds in their Xbox format, the PC plays Wwise                               |
-| Reference     | 8,396 (3.6%)    | `.ofc` 3,502, `.act` 2,107, `.snk` 1,008, `.smd` 966, `.ova` 678, `.txg` 132, ...                                                               |
-| Texture table | 3,700 (1.6%)    | `.tex`, listed in `texParamTable`, they start with `0E 00 0x 00` (16 with `00 00 02 00`)                                                        |
-| Empty         | 750 (0.3%)      | No data                                                                                                                                         |
-| PNG signature | 15              | `.png`                                                                                                                                          |
-| Unknown       | 114,447 (48.6%) | Down from 139,536 before the references and the load traces, every new trace types more                                                         |
+| Rule          | Entries        | Types                                                                                                                                           |
+|---------------|----------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
+| Jade tag      | 71,465 (30.4%) | `.gao` 70,828 (game objects), `.wow` 637 (worlds, the world name at `+0x10`)                                                                    |
+| Structure     | 27,455 (11.7%) | `.oin` 17,415, `.map` 7,353, `.cob` 2,687 (see below)                                                                                           |
+| Load trace    | 16,693 (7.1%)  | Graphic objects or materials 5,922, `.oin` 2,490, `.ova` 2,490, `.trl` 1,305, link lists 946, `.map` 772, `.cob` 565, `.gol` 476, ...           |
+| Name          | 11,072 (4.7%)  | `.cgro` 11,071 (named `<decimal key>.cgro`, every one matches an existing key, likely the remaster's compiled graphic objects), `texParamTable` |
+| RIFF header   | 8,840 (3.8%)   | `.wav`, all XMA2 (`0x166`), mostly 32 kHz mono: the original Jade sounds in their Xbox format, the PC plays Wwise                               |
+| Reference     | 8,396 (3.6%)   | `.ofc` 3,502, `.act` 2,107, `.snk` 1,008, `.smd` 966, `.ova` 678, `.txg` 132, ...                                                               |
+| Texture table | 3,700 (1.6%)   | `.tex`, listed in `texParamTable`, they start with `0E 00 0x 00` (16 with `00 00 02 00`)                                                        |
+| Empty         | 750 (0.3%)     | No data                                                                                                                                         |
+| PNG signature | 15             | `.png`                                                                                                                                          |
+| Unknown       | 86,992 (37.0%) | Down from 139,536 before the references, the load traces and the structural rules, every new trace types more                                   |
 
-The 37,772 entries of 8 bytes holding two keys are mostly AI instances (`.oin`, a model key then a variables key),
-the traces typed 2,490 of them. A structural rule (two keys, an AI model then AI variables) could type the others.
+The **structural rules** recognize an entry from its content and the types of the keys it holds, applied until they
+stop typing new entries, each one checked against the entries the other rules typed (none matches an entry of
+another type):
+| Rule             | Recognizes                                                                                                         | Typed  | Matches among the entries typed by other rules                        |
+|------------------|--------------------------------------------------------------------------------------------------------------------|--------|-----------------------------------------------------------------------|
+| AI instance      | 8 bytes, the key of an AI model, then a key (its variables, `own key - 1` for 2,475 of the 2,490 traced instances) | 17,415 | All 2,490 traced AI instances                                         |
+| Collision map    | 8 bytes, `01 FF 00 00`, then the key of a collision object                                                         | 7,353  | All 759 traced 8-byte collision maps                                  |
+| Collision object | Starts with the key of the collision game materials                                                                | 2,687  | 378 of the 565 traced collision objects, the others start differently |
+
+The 8-byte entries were the biggest block of unknowns (37,772): AI instances, collision maps (`01 FF 00 00` then a
+key) and about 1,100 entries of other shapes.
 
 `texParamTable` is an array of 3,700 records of 64 bytes, one per texture: the texture key first, then fields
 framed by the `0xCAD01234` (`+0x20`) and `0xC0DEC0DE` (`+0x30`) markers of the original Jade texture headers.

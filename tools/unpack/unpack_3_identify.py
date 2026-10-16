@@ -7,6 +7,8 @@ The rules, the first that applies wins:
 2. The references to it: Jade's reference lists store the extension of every key they reference
    ([uint32 key][".gao"]), the extension most entries give it.
 3. The load traces collected in "workspace/traces/": the type of the loader callback the game loaded it with.
+4. The structural rules, for the entries still unknown: their content and the types of the keys they hold (e.g. an
+   AI instance is the key of an AI model then a key), applied until they stop typing new entries.
 Collecting new traces types more entries, identify the paks again ("--force") after that.
 
 Output, one folder per pak in "workspace/unpacked/3-identified/":
@@ -21,12 +23,22 @@ import os
 import shutil
 import time
 from collections import Counter, defaultdict
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
+from typing import NamedTuple
 
 from tools.bpak import PakEntry
 from tools.constants import (
+    AI_INSTANCE_SIZE,
+    AI_INSTANCE_TYPE,
+    AI_MODEL_TYPE,
+    COLLISION_GAME_MATERIALS_TYPE,
+    COLLISION_MAP_HEADER,
+    COLLISION_MAP_SIZE,
+    COLLISION_MAP_TYPE,
+    COLLISION_OBJECT_TYPE,
     EMPTY_TYPE,
     ENTRIES_DIR_NAME,
     EXTRA_SUFFIX,
@@ -40,6 +52,7 @@ from tools.constants import (
     REFERENCE_SCAN_MAX_SIZE,
     RIFF_SIGNATURE,
     RIFF_WAVE_FORM,
+    STRUCTURAL_RULE_MAX_PASSES,
     TEXTURE_RECORD,
     TEXTURE_TABLE_NAME,
     TOC_FILE_NAME,
@@ -242,34 +255,144 @@ def identified_file_name(entry: PakEntry, entry_type: str) -> str:
     return f"{entry.file_name}.{entry_type}"
 
 
-def identify_pak(input_dir: Path, output_dir: Path, traced_types: dict[int, str]) -> Counter[str]:
-    """Identifies one pak folder of layer 2, the index is written last, so its presence means the pak is complete.
+def read_uint32(data: bytes, offset: int) -> int | None:
+    """Reads a little-endian 32-bit value.
 
     Args:
-        input_dir: The pak folder of layer 2.
-        output_dir: The pak folder of this layer, replaced if it exists.
-        traced_types: The type of every key loaded with an identified callback in the collected traces.
+        data: The bytes.
+        offset: The offset of the value.
 
     Returns:
-        The number of entries of every type.
+        The value, None if the bytes are too short.
     """
-    _, entries, files = read_toc(input_dir / TOC_FILE_NAME)
-    entries_dir = input_dir / ENTRIES_DIR_NAME
+    return int.from_bytes(data[offset : offset + 4], "little") if len(data) >= offset + 4 else None
 
-    known_types = KnownTypes(
-        texture_keys=read_texture_keys(entries_dir),
-        referenced_types=read_referenced_types(entries_dir, entries, files),
-        traced_types=traced_types,
+
+def is_collision_object(_entry: PakEntry, head: bytes, types_by_key: dict[int, str]) -> bool:
+    """A collision object starts with the key of the collision game materials."""
+    return types_by_key.get(read_uint32(head, 0) or 0) == COLLISION_GAME_MATERIALS_TYPE
+
+
+def is_collision_map(entry: PakEntry, head: bytes, types_by_key: dict[int, str]) -> bool:
+    """A collision map with a single collision object, its header then the key of the collision object."""
+    return (
+        entry.size == COLLISION_MAP_SIZE
+        and read_uint32(head, 0) == COLLISION_MAP_HEADER
+        and types_by_key.get(read_uint32(head, 4) or 0) == COLLISION_OBJECT_TYPE
     )
 
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
 
-    def identify_entry(index: int) -> tuple[str, str]:
-        entry, file = entries[index], files[index]
+def is_ai_instance(entry: PakEntry, head: bytes, types_by_key: dict[int, str]) -> bool:
+    """An AI instance, the key of its AI model then the key of its AI variables."""
+    return (
+        entry.size == AI_INSTANCE_SIZE
+        and types_by_key.get(read_uint32(head, 0) or 0) == AI_MODEL_TYPE
+        and (read_uint32(head, 4) or 0) in types_by_key
+    )
 
+
+class StructuralRule(NamedTuple):
+    """A rule recognizing an entry from its content and the types of the keys it holds."""
+
+    name: str
+    entry_type: str
+    matches: Callable[[PakEntry, bytes, dict[int, str]], bool]
+
+
+# In dependency order, a collision map is only recognized once its collision object is typed
+STRUCTURAL_RULES = (
+    StructuralRule("collision object", COLLISION_OBJECT_TYPE, is_collision_object),
+    StructuralRule("collision map", COLLISION_MAP_TYPE, is_collision_map),
+    StructuralRule("AI instance", AI_INSTANCE_TYPE, is_ai_instance),
+)
+
+
+def apply_structural_rules(entries: list[PakEntry], heads: list[bytes], results: list[tuple[str, str]]) -> list[str]:
+    """Applies the structural rules to the entries still unknown, until they stop typing new ones.
+
+    Every rule is also checked against the entries the other rules typed: a rule matching entries typed differently
+    would be wrong somewhere, the report says how many entries it matches by type.
+
+    Args:
+        entries: The entries of the pak.
+        heads: The first bytes of every entry.
+        results: The type and rule of every entry, completed in place.
+
+    Returns:
+        A report line per rule.
+    """
+    types_by_key = {entry.key: result[0] for entry, result in zip(entries, results) if entry.key is not None}
+    typed_before = list(results)
+
+    for _ in range(STRUCTURAL_RULE_MAX_PASSES):
+        typed_count = 0
+
+        for index, entry in enumerate(entries):
+            if results[index][0] != UNKNOWN_TYPE or entry.key is None:
+                continue
+
+            for rule in STRUCTURAL_RULES:
+                if rule.matches(entry, heads[index], types_by_key):
+                    results[index] = (rule.entry_type, f"structure: {rule.name}")
+                    types_by_key[entry.key] = rule.entry_type
+                    typed_count += 1
+                    break
+
+        if typed_count == 0:
+            break
+
+    reports = []
+
+    for rule in STRUCTURAL_RULES:
+        typed = sum(1 for _, result_rule in results if result_rule == f"structure: {rule.name}")
+        agreement: Counter[str] = Counter(
+            entry_type
+            for entry, head, (entry_type, _) in zip(entries, heads, typed_before)
+            if entry_type != UNKNOWN_TYPE and rule.matches(entry, head, types_by_key)
+        )
+        checked = ", ".join(f"{entry_type} {count}" for entry_type, count in agreement.most_common()) or "none"
+        reports.append(f"structure: {rule.name} typed {typed}, also matches entries typed by other rules: {checked}")
+
+    return reports
+
+
+def read_heads(entries_dir: Path, files: list[str]) -> list[bytes]:
+    """Reads the first bytes of every entry.
+
+    Args:
+        entries_dir: The entries folder of the pak in layer 2.
+        files: The file name of every entry in layer 2.
+
+    Returns:
+        The first `IDENTIFY_HEAD_SIZE` bytes of every entry.
+    """
+
+    def read_head(file: str) -> bytes:
         with open(entries_dir / file, "rb") as entry_file:
-            entry_type, rule = identify(entry, entry_file.read(IDENTIFY_HEAD_SIZE), known_types)
+            return entry_file.read(IDENTIFY_HEAD_SIZE)
+
+    with ThreadPoolExecutor(WORKER_THREADS) as executor:
+        return list(executor.map(read_head, files))
+
+
+def link_entries(
+    entries_dir: Path, output_dir: Path, entries: list[PakEntry], files: list[str], types: list[str]
+) -> list[str]:
+    """Hard links every entry of a pak into the folder of its type.
+
+    Args:
+        entries_dir: The entries folder of the pak in layer 2.
+        output_dir: The pak folder of this layer.
+        entries: The entries of the pak.
+        files: The file name of every entry in layer 2.
+        types: The type of every entry.
+
+    Returns:
+        The file of every entry in this layer, relative to the pak folder.
+    """
+
+    def link_entry(index: int) -> str:
+        entry, file, entry_type = entries[index], files[index], types[index]
 
         type_dir = output_dir / entry_type
         type_dir.mkdir(parents=True, exist_ok=True)
@@ -280,19 +403,51 @@ def identify_pak(input_dir: Path, output_dir: Path, traced_types: dict[int, str]
         if entry.extra_size:
             link_file(entries_dir / (file + EXTRA_SUFFIX), type_dir / (output_name + EXTRA_SUFFIX))
 
-        return rule, f"{entry_type}/{output_name}"
+        return f"{entry_type}/{output_name}"
 
     # Consuming the results surfaces the exceptions raised in the threads
     with ThreadPoolExecutor(WORKER_THREADS) as executor:
-        results = list(executor.map(identify_entry, range(len(entries))))
+        return list(executor.map(link_entry, range(len(entries))))
+
+
+def identify_pak(input_dir: Path, output_dir: Path, traced_types: dict[int, str]) -> tuple[Counter[str], list[str]]:
+    """Identifies one pak folder of layer 2, the index is written last, so its presence means the pak is complete.
+
+    Every entry is identified before any is linked, the structural rules depend on the types of other entries.
+
+    Args:
+        input_dir: The pak folder of layer 2.
+        output_dir: The pak folder of this layer, replaced if it exists.
+        traced_types: The type of every key loaded with an identified callback in the collected traces.
+
+    Returns:
+        The number of entries of every type, and a report line per structural rule.
+    """
+    _, entries, files = read_toc(input_dir / TOC_FILE_NAME)
+    entries_dir = input_dir / ENTRIES_DIR_NAME
+
+    known_types = KnownTypes(
+        texture_keys=read_texture_keys(entries_dir),
+        referenced_types=read_referenced_types(entries_dir, entries, files),
+        traced_types=traced_types,
+    )
+
+    heads = read_heads(entries_dir, files)
+    results = [identify(entry, head, known_types) for entry, head in zip(entries, heads)]
+    rule_reports = apply_structural_rules(entries, heads, results)
+
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+
+    output_files = link_entries(entries_dir, output_dir, entries, files, [entry_type for entry_type, _ in results])
 
     index = {
-        file: {"type": output_file.split("/")[0], "rule": rule, "file": output_file}
-        for file, (rule, output_file) in zip(files, results)
+        file: {"type": entry_type, "rule": rule, "file": output_file}
+        for file, (entry_type, rule), output_file in zip(files, results, output_files)
     }
 
     (output_dir / INDEX_FILE_NAME).write_text(json.dumps(index, indent=1), encoding="utf-8")
-    return Counter(item["type"] for item in index.values())
+    return Counter(item["type"] for item in index.values()), rule_reports
 
 
 def main() -> None:
@@ -314,10 +469,13 @@ def main() -> None:
 
         print(f"{input_dir.name}: identifying", flush=True)
         start_time = time.perf_counter()
-        type_counts = identify_pak(input_dir, output_dir, traced_types)
+        type_counts, rule_reports = identify_pak(input_dir, output_dir, traced_types)
 
         summary = ", ".join(f"{entry_type} {count}" for entry_type, count in type_counts.most_common())
         print(f"  {summary}", flush=True)
+
+        for rule_report in rule_reports:
+            print(f"  {rule_report}", flush=True)
         print(f"  Done in {time.perf_counter() - start_time:.1f} s", flush=True)
 
 

@@ -140,6 +140,24 @@ REFERENCE_SCAN_MAX_SIZE = 256 * 1024
 UNKNOWN_TYPE = "unknown"
 EMPTY_TYPE = "empty"
 
+# The structural rules recognize an entry from its content and the types of the keys it holds, they're applied until
+# they stop typing new entries (a rule's result can be another rule's input), at most this many passes
+STRUCTURAL_RULE_MAX_PASSES = 8
+
+# The types the structural rules rely on or produce
+AI_MODEL_TYPE = "omd"
+AI_INSTANCE_TYPE = "oin"
+COLLISION_GAME_MATERIALS_TYPE = "collision-game-materials"
+COLLISION_OBJECT_TYPE = "cob"
+COLLISION_MAP_TYPE = "map"
+
+# An AI instance is 8 bytes, the key of its AI model then the key of its AI variables
+AI_INSTANCE_SIZE = 8
+
+# A collision map with a single collision object is 8 bytes, "01 FF 00 00" then the key of the collision object
+COLLISION_MAP_SIZE = 8
+COLLISION_MAP_HEADER = 0xFF01
+
 # endregion
 
 # region Load trace
