@@ -29,4 +29,5 @@ struct Signature {
  */
 struct LoaderConfig {
     bool isEnabled; // Master switch, the ASI loads but does nothing when false
+    bool traceLoads; // Research: writes every file reference the game resolves (key, loader, parent) to a TSV file
 };

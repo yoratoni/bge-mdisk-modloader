@@ -20,5 +20,7 @@ LoaderConfig configLoad(const std::filesystem::path& configFilePath) {
 
     config.isEnabled = readBool(configFilePath, CONFIG_SECTION_GENERAL, CONFIG_KEY_ENABLED, config.isEnabled);
 
+    config.traceLoads = readBool(configFilePath, CONFIG_SECTION_DEBUG, CONFIG_KEY_TRACE_LOADS, config.traceLoads);
+
     return config;
 }

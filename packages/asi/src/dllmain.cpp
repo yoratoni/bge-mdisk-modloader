@@ -1,5 +1,7 @@
 #include "core/config.hpp"
 #include "core/constants.hpp"
+#include "core/hooks.hpp"
+#include "core/loadTrace.hpp"
 #include "core/log.hpp"
 #include "core/memory.hpp"
 #include <chrono>
@@ -54,14 +56,22 @@ static void initialize(HMODULE asiModule) {
 
     const LoaderConfig config = configLoad(asiDirectory / CONFIG_FILE_NAME);
 
-    logWrite(std::format("Config: enabled={}", config.isEnabled));
+    logWrite(std::format("Config: enabled={} traceLoads={}", config.isEnabled, config.traceLoads));
 
     if (!config.isEnabled) {
         logWrite("Disabled in the configuration, staying inactive");
         return;
     }
 
-    logWrite("Ready");
+    if (config.traceLoads) {
+        loadTraceInit(asiDirectory / LOAD_TRACE_FILE_NAME);
+    }
+
+    if (hooksInstall(GetModuleHandleW(nullptr), config)) {
+        logWrite("Ready");
+    } else {
+        logWrite("Installation failed, see above");
+    }
 }
 
 BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
