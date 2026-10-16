@@ -8,11 +8,8 @@ import argparse
 import shutil
 from pathlib import Path
 
-from common import DEFAULT_GAME_DIR, GAME_COPY_DIR, format_size
-
-# The files and folders copied, relative to the game folder ("Data/Movies"
-# is left out, the Bink movies are loose files with nothing to unpack)
-GAME_ENTRIES = ["Config", "Data/BigDir.jdproj", "Data/Paks"]
+from tools.constants import BACKUPS_DIR, GAME_COPY_DIR, GAME_ENTRIES
+from tools.utils import add_game_argument, check_game_dir, format_size
 
 
 def needs_copy(source: Path, destination: Path) -> bool:
@@ -39,11 +36,9 @@ def needs_copy(source: Path, destination: Path) -> bool:
 def main() -> None:
     """Copies the game files into "workspace/game/"."""
     parser = argparse.ArgumentParser(description="Copies the game files into workspace/game/")
-    parser.add_argument("--game", type=Path, default=DEFAULT_GAME_DIR, help="The game folder (containing bge.exe)")
+    add_game_argument(parser)
     args = parser.parse_args()
-
-    if not (args.game / "bge.exe").is_file():
-        parser.error(f"bge.exe not found in {args.game}")
+    check_game_dir(parser, args.game)
 
     copied_count = 0
     skipped_count = 0
@@ -60,17 +55,21 @@ def main() -> None:
             relative_path = file.relative_to(args.game)
             destination = GAME_COPY_DIR / relative_path
 
-            if not needs_copy(file, destination):
+            # A file replaced by "tools.install_paks" is copied from its backup, the game's original
+            backup = BACKUPS_DIR / relative_path
+            original_file = backup if backup.exists() else file
+
+            if not needs_copy(original_file, destination):
                 skipped_count += 1
                 continue
 
             destination.parent.mkdir(parents=True, exist_ok=True)
 
             # Keeps the modification time, which is what "needs_copy" compares on the next run
-            shutil.copy2(file, destination)
+            shutil.copy2(original_file, destination)
             copied_count += 1
 
-            print(f"Copied {relative_path.as_posix()} ({format_size(file.stat().st_size)})", flush=True)
+            print(f"Copied {relative_path.as_posix()} ({format_size(original_file.stat().st_size)})", flush=True)
 
     print(f"Done: {copied_count} copied, {skipped_count} already up to date")
 

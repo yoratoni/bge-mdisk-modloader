@@ -61,7 +61,7 @@ There is **no anti-cheat** and the game is offline single-player, so modding car
 `version=Steam`), it's likely store specific.
 
 ### BPAK format
-**Confirmed**: the paks are rebuilt byte-identically from their unpacked entries (`tools/repack_1_bpak.py`), the
+**Confirmed**: the paks are rebuilt byte-identically from their unpacked entries (`tools.repack.repack_2_bpak`), the
 layout is computed from scratch, so the rules below are the whole format. Every integer is little-endian.
 
 The header is `0x18` bytes:
@@ -113,7 +113,7 @@ Jade files can start with a 4-character type tag (Ray1Map's `Jade_FileType`: `.g
 engine knows the type of every other key from the reference it follows, so typing the rest requires walking the
 references from the universe key (`0x71003FF9`) and parsing every format on the way.
 
-What `tools/unpack_3_identify.py` can identify with certainty in `Resources.pak`:
+What `tools.unpack.unpack_3_identify` can identify with certainty in `Resources.pak`:
 | Type    | Entries | How                                                                                                                       |
 |---------|---------|---------------------------------------------------------------------------------------------------------------------------|
 | `.gao`  | 70,828  | Game objects, tag at offset 0                                                                                             |

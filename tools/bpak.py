@@ -8,28 +8,18 @@ Layout, every integer little-endian:
 """
 
 import mmap
-import struct
 from dataclasses import dataclass
 from pathlib import Path
 
-MAGIC = b"BPAK"
-
-# Magic, three unknown fields (kept as is), entry count, table of contents size
-HEADER = struct.Struct("<4sIIIII")
-
-# Every data slot (and the table of contents) starts on a 16-byte boundary, padded with spaces
-ALIGNMENT = 16
-PADDING_BYTE = b" "
-
-# Entry flags, a named entry stores a name, a keyed entry a 32-bit Jade key
-FLAG_NAMED = 0
-FLAG_KEYED = 1
-
-# Name length or key
-ENTRY_ID = struct.Struct("<I")
-
-# Size, packed size (0 = stored raw), extra size, unknown (constant per pak, kept as is), offset
-ENTRY_FIELDS = struct.Struct("<IIIIQ")
+from tools.constants import (
+    BPAK_ALIGNMENT,
+    BPAK_ENTRY_FIELDS,
+    BPAK_ENTRY_ID,
+    BPAK_FLAG_KEYED,
+    BPAK_FLAG_NAMED,
+    BPAK_HEADER,
+    BPAK_MAGIC,
+)
 
 
 @dataclass
@@ -56,7 +46,7 @@ class PakEntry:
     @property
     def flag(self) -> int:
         """The flag stored in the table of contents, derived from the identifier."""
-        return FLAG_NAMED if self.name is not None else FLAG_KEYED
+        return BPAK_FLAG_NAMED if self.name is not None else BPAK_FLAG_KEYED
 
     @property
     def is_compressed(self) -> bool:
@@ -80,7 +70,7 @@ class PakEntry:
 
 
 def align(value: int) -> int:
-    """Rounds a value up to the next multiple of `ALIGNMENT`.
+    """Rounds a value up to the next multiple of `BPAK_ALIGNMENT`.
 
     Args:
         value: The value to align.
@@ -88,7 +78,7 @@ def align(value: int) -> int:
     Returns:
         The aligned value.
     """
-    return (value + ALIGNMENT - 1) & ~(ALIGNMENT - 1)
+    return (value + BPAK_ALIGNMENT - 1) & ~(BPAK_ALIGNMENT - 1)
 
 
 class Pak:
@@ -125,7 +115,7 @@ class Pak:
         Returns:
             The stored bytes.
         """
-        start = HEADER.size + entry.offset
+        start = BPAK_HEADER.size + entry.offset
         return self._view[start : start + entry.stored_size]
 
     def read_extra(self, entry: PakEntry) -> bytes:
@@ -137,13 +127,13 @@ class Pak:
         Returns:
             The extra bytes, empty if the entry has none.
         """
-        start = HEADER.size + entry.offset + entry.stored_size
+        start = BPAK_HEADER.size + entry.offset + entry.stored_size
         return self._view[start : start + entry.extra_size]
 
     def _parse(self) -> tuple[PakHeader, list[PakEntry]]:
-        magic, unknown_04, unknown_08, unknown_0c, entry_count, table_size = HEADER.unpack_from(self._view, 0)
+        magic, unknown_04, unknown_08, unknown_0c, entry_count, table_size = BPAK_HEADER.unpack_from(self._view, 0)
 
-        if magic != MAGIC:
+        if magic != BPAK_MAGIC:
             raise ValueError(f"{self.path.name}: not a BPAK archive (magic {magic!r})")
 
         position = len(self._view) - table_size
@@ -170,22 +160,22 @@ class Pak:
             The entry and the position of the next one.
         """
         flag = self._view[position]
-        (identifier,) = ENTRY_ID.unpack_from(self._view, position + 1)
-        position += 1 + ENTRY_ID.size
+        (identifier,) = BPAK_ENTRY_ID.unpack_from(self._view, position + 1)
+        position += 1 + BPAK_ENTRY_ID.size
 
-        if flag == FLAG_NAMED:
+        if flag == BPAK_FLAG_NAMED:
             name = self._view[position : position + identifier].decode("latin-1")
             key = None
             position += identifier
-        elif flag == FLAG_KEYED:
+        elif flag == BPAK_FLAG_KEYED:
             name = None
             key = identifier
         else:
             raise ValueError(f"{self.path.name}: unknown entry flag {flag} at {position:#x}")
 
-        fields = ENTRY_FIELDS.unpack_from(self._view, position)
+        fields = BPAK_ENTRY_FIELDS.unpack_from(self._view, position)
 
-        return PakEntry(name, key, *fields), position + ENTRY_FIELDS.size
+        return PakEntry(name, key, *fields), position + BPAK_ENTRY_FIELDS.size
 
 
 def serialize_table(entries: list[PakEntry]) -> bytes:
@@ -204,10 +194,10 @@ def serialize_table(entries: list[PakEntry]) -> bytes:
 
         if entry.name is not None:
             name = entry.name.encode("latin-1")
-            table += ENTRY_ID.pack(len(name)) + name
+            table += BPAK_ENTRY_ID.pack(len(name)) + name
         else:
-            table += ENTRY_ID.pack(entry.key)
+            table += BPAK_ENTRY_ID.pack(entry.key)
 
-        table += ENTRY_FIELDS.pack(entry.size, entry.packed_size, entry.extra_size, entry.unknown, entry.offset)
+        table += BPAK_ENTRY_FIELDS.pack(entry.size, entry.packed_size, entry.extra_size, entry.unknown, entry.offset)
 
     return bytes(table)

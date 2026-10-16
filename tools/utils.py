@@ -1,49 +1,55 @@
-"""Paths and helpers shared by every tool."""
+"""Helpers shared by every tool."""
 
+import argparse
 import json
 from pathlib import Path
 from typing import Any
 
-from bpak import PakEntry, PakHeader
+from tools.bpak import PakEntry, PakHeader
+from tools.constants import DEFAULT_GAME_DIR, GAME_EXECUTABLE_NAME, TOC_FILE_NAME
 
-# The repository root, every other path is derived from it
-REPO_DIR = Path(__file__).resolve().parent.parent
 
-# Ignored by git, holds the copy of the game files and every unpacked layer
-WORKSPACE_DIR = REPO_DIR / "workspace"
+def add_game_argument(parser: argparse.ArgumentParser) -> None:
+    """Adds the "--game" argument, the game folder (the default Steam folder when not given).
 
-# The copy of the game files the tools work on, mirroring the game folder layout (the game install is never touched)
-GAME_COPY_DIR = WORKSPACE_DIR / "game"
+    Args:
+        parser: The argument parser of the tool.
+    """
+    parser.add_argument(
+        "--game", type=Path, default=DEFAULT_GAME_DIR, help=f"The game folder (containing {GAME_EXECUTABLE_NAME})"
+    )
 
-# The copy of the pak archives
-PAKS_DIR = GAME_COPY_DIR / "Data" / "Paks"
 
-# The unpacked layers, each one is made from the previous one
-UNPACKED_DIR = WORKSPACE_DIR / "unpacked"
+def check_game_dir(parser: argparse.ArgumentParser, game_dir: Path) -> None:
+    """Exits with a usage error when a folder isn't the game folder.
 
-# Layer 1: the entries of every pak as stored (LZ4 blocks or raw) and their table of contents
-BPAK_LAYER_DIR = UNPACKED_DIR / "1-bpak"
+    Args:
+        parser: The argument parser of the tool.
+        game_dir: The folder given with "--game".
+    """
+    if not (game_dir / GAME_EXECUTABLE_NAME).is_file():
+        parser.error(f"{GAME_EXECUTABLE_NAME} not found in {game_dir}")
 
-# Layer 2: the entries of layer 1 decompressed
-LZ4_LAYER_DIR = UNPACKED_DIR / "2-lz4"
 
-# Layer 3: the entries of layer 2 sorted by type
-IDENTIFIED_LAYER_DIR = UNPACKED_DIR / "3-identified"
+def select_layer_paks(parser: argparse.ArgumentParser, layer_dir: Path, pattern: str, producer: str) -> list[Path]:
+    """Lists the complete pak folders of a layer (those holding a table of contents) matching a pattern, exits with
+    a usage error when there are none.
 
-# The paks rebuilt from layer 1, to check it holds everything
-REPACKED_DIR = WORKSPACE_DIR / "repacked"
+    Args:
+        parser: The argument parser of the tool.
+        layer_dir: The layer folder.
+        pattern: A glob pattern on the pak names (e.g. "Text-*").
+        producer: The module that produces the layer, suggested in the usage error.
 
-# The name of the table of contents written in every pak folder of a layer
-TOC_FILE_NAME = "toc.json"
+    Returns:
+        The matching pak folders, sorted by name.
+    """
+    pak_dirs = sorted(path for path in layer_dir.glob(pattern) if (path / TOC_FILE_NAME).exists())
 
-# The folder holding the entry files in every pak folder of a layer
-ENTRIES_DIR_NAME = "entries"
+    if not pak_dirs:
+        parser.error(f"no pak matches {pattern!r} in {layer_dir} (run {producer} first)")
 
-# The suffix of the files holding the extra bytes of an entry
-EXTRA_SUFFIX = ".extra"
-
-# The default game folder (Steam), overridable with "--game"
-DEFAULT_GAME_DIR = Path(r"F:\SteamLibrary\steamapps\common\Beyond Good and Evil - 20th Anniversary Edition")
+    return pak_dirs
 
 
 def format_size(size: int) -> str:

@@ -10,11 +10,20 @@ import dataclasses
 import time
 from pathlib import Path
 
-from bpak import HEADER, MAGIC, PADDING_BYTE, PakEntry, PakHeader, align, serialize_table
-from common import BPAK_LAYER_DIR, ENTRIES_DIR_NAME, EXTRA_SUFFIX, PAKS_DIR, REPACKED_DIR, TOC_FILE_NAME, read_toc
-
-# Large buffers, the paks go up to 8 GiB
-IO_BUFFER_SIZE = 16 * 1024 * 1024
+from tools.bpak import PakEntry, PakHeader, align, serialize_table
+from tools.constants import (
+    BPAK_HEADER,
+    BPAK_LAYER_DIR,
+    BPAK_MAGIC,
+    BPAK_PADDING_BYTE,
+    ENTRIES_DIR_NAME,
+    EXTRA_SUFFIX,
+    IO_BUFFER_SIZE,
+    PAKS_DIR,
+    REPACKED_DIR,
+    TOC_FILE_NAME,
+)
+from tools.utils import read_toc, select_layer_paks
 
 
 def pack_header(header: PakHeader, entry_count: int, table_size: int) -> bytes:
@@ -28,7 +37,8 @@ def pack_header(header: PakHeader, entry_count: int, table_size: int) -> bytes:
     Returns:
         The header bytes.
     """
-    return HEADER.pack(MAGIC, header.unknown_04, header.unknown_08, header.unknown_0c, entry_count, table_size)
+    unknown_fields = (header.unknown_04, header.unknown_08, header.unknown_0c)
+    return BPAK_HEADER.pack(BPAK_MAGIC, *unknown_fields, entry_count, table_size)
 
 
 def repack_pak(input_dir: Path, output_path: Path) -> None:
@@ -60,7 +70,7 @@ def repack_pak(input_dir: Path, output_path: Path) -> None:
             if entry.extra_size:
                 slot += (entries_dir / (entry.file_name + EXTRA_SUFFIX)).read_bytes()
 
-            output.write(slot + PADDING_BYTE * (align(len(slot)) - len(slot)))
+            output.write(slot + BPAK_PADDING_BYTE * (align(len(slot)) - len(slot)))
             placed_entries.append(dataclasses.replace(entry, offset=offset))
             offset += align(len(slot))
 
@@ -106,11 +116,7 @@ def main() -> None:
     parser.add_argument("--keep", action="store_true", help="Keep the rebuilt paks even when they're identical")
     args = parser.parse_args()
 
-    input_dirs = sorted(path for path in BPAK_LAYER_DIR.glob(args.pak) if (path / TOC_FILE_NAME).exists())
-
-    if not input_dirs:
-        parser.error(f"no unpacked pak matches {args.pak!r} in {BPAK_LAYER_DIR} (run unpack_1_bpak.py first)")
-
+    input_dirs = select_layer_paks(parser, BPAK_LAYER_DIR, args.pak, "tools.unpack.unpack_1_bpak")
     identical_count = 0
 
     for input_dir in input_dirs:

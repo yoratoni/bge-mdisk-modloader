@@ -12,14 +12,17 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from bpak import Pak, PakEntry
-from common import BPAK_LAYER_DIR, ENTRIES_DIR_NAME, EXTRA_SUFFIX, PAKS_DIR, TOC_FILE_NAME, format_size, write_toc
-
-# Appended to the file name of a compressed entry
-LZ4_SUFFIX = ".lz4"
-
-# Writing many small files is bound by the file system rather than the CPU, threads overlap the writes
-WRITER_THREADS = 8
+from tools.bpak import Pak, PakEntry
+from tools.constants import (
+    BPAK_LAYER_DIR,
+    ENTRIES_DIR_NAME,
+    EXTRA_SUFFIX,
+    LZ4_SUFFIX,
+    PAKS_DIR,
+    TOC_FILE_NAME,
+    WORKER_THREADS,
+)
+from tools.utils import format_size, write_toc
 
 
 def stored_file_name(entry: PakEntry) -> str:
@@ -58,7 +61,7 @@ def unpack_pak(pak_path: Path, output_dir: Path) -> None:
                 (entries_dir / (entry.file_name + EXTRA_SUFFIX)).write_bytes(pak.read_extra(entry))
 
         # Consuming the results surfaces the exceptions raised in the threads
-        with ThreadPoolExecutor(WRITER_THREADS) as executor:
+        with ThreadPoolExecutor(WORKER_THREADS) as executor:
             list(executor.map(write_entry, range(len(pak.entries))))
 
         write_toc(output_dir / TOC_FILE_NAME, pak.header, pak.entries, files)
@@ -77,7 +80,7 @@ def main() -> None:
     pak_paths = sorted(PAKS_DIR.glob(f"{args.pak}.pak"))
 
     if not pak_paths:
-        parser.error(f"no pak matches {args.pak!r} in {PAKS_DIR} (run copy_game.py first)")
+        parser.error(f"no pak matches {args.pak!r} in {PAKS_DIR} (run tools.copy_game first)")
 
     for pak_path in pak_paths:
         output_dir = BPAK_LAYER_DIR / pak_path.stem

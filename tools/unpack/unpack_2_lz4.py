@@ -13,19 +13,8 @@ from pathlib import Path
 
 import lz4.block
 
-from common import (
-    BPAK_LAYER_DIR,
-    ENTRIES_DIR_NAME,
-    EXTRA_SUFFIX,
-    LZ4_LAYER_DIR,
-    TOC_FILE_NAME,
-    format_size,
-    read_toc,
-    write_toc,
-)
-
-# LZ4 releases the GIL while decompressing, threads overlap both the decompression and the writes
-WORKER_THREADS = 8
+from tools.constants import BPAK_LAYER_DIR, ENTRIES_DIR_NAME, EXTRA_SUFFIX, LZ4_LAYER_DIR, TOC_FILE_NAME, WORKER_THREADS
+from tools.utils import format_size, read_toc, select_layer_paks, write_toc
 
 
 def unpack_pak(input_dir: Path, output_dir: Path) -> None:
@@ -79,12 +68,7 @@ def main() -> None:
     parser.add_argument("--force", action="store_true", help="Decompress again the paks that are already done")
     args = parser.parse_args()
 
-    input_dirs = sorted(path for path in BPAK_LAYER_DIR.glob(args.pak) if (path / TOC_FILE_NAME).exists())
-
-    if not input_dirs:
-        parser.error(f"no unpacked pak matches {args.pak!r} in {BPAK_LAYER_DIR} (run unpack_1_bpak.py first)")
-
-    for input_dir in input_dirs:
+    for input_dir in select_layer_paks(parser, BPAK_LAYER_DIR, args.pak, "tools.unpack.unpack_1_bpak"):
         output_dir = LZ4_LAYER_DIR / input_dir.name
 
         if (output_dir / TOC_FILE_NAME).exists() and not args.force:

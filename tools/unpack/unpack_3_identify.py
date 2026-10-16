@@ -13,38 +13,32 @@ Output, one folder per pak in "workspace/unpacked/3-identified/":
 import argparse
 import json
 import os
-import re
 import shutil
-import struct
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from bpak import PakEntry
-from common import ENTRIES_DIR_NAME, EXTRA_SUFFIX, IDENTIFIED_LAYER_DIR, LZ4_LAYER_DIR, TOC_FILE_NAME, read_toc
-
-# The name of the index written in every pak folder of this layer
-INDEX_FILE_NAME = "identified.json"
-
-# The bytes read from the start of every entry to identify it
-HEAD_SIZE = 16
-
-# Linking many files is bound by the file system rather than the CPU, threads overlap the operations
-WORKER_THREADS = 8
-
-# A Jade file tagged with its type, the 4-byte extension (e.g. ".gao") at offset 0
-JADE_TAG_PATTERN = re.compile(rb"\.[a-z0-9]{3}")
-
-PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
-
-# The table of texture parameters ("Resources.pak"), 64-byte records starting with the texture key
-TEXTURE_TABLE_NAME = "texParamTable"
-TEXTURE_RECORD = struct.Struct("<I60x")
-
-# The types of the entries that can't be identified and of the entries without data
-UNKNOWN_TYPE = "unknown"
-EMPTY_TYPE = "empty"
+from tools.bpak import PakEntry
+from tools.constants import (
+    EMPTY_TYPE,
+    ENTRIES_DIR_NAME,
+    EXTRA_SUFFIX,
+    IDENTIFIED_LAYER_DIR,
+    IDENTIFY_HEAD_SIZE,
+    INDEX_FILE_NAME,
+    JADE_TAG_PATTERN,
+    LZ4_LAYER_DIR,
+    PNG_SIGNATURE,
+    RIFF_SIGNATURE,
+    RIFF_WAVE_FORM,
+    TEXTURE_RECORD,
+    TEXTURE_TABLE_NAME,
+    TOC_FILE_NAME,
+    UNKNOWN_TYPE,
+    WORKER_THREADS,
+)
+from tools.utils import read_toc, select_layer_paks
 
 
 def read_texture_keys(entries_dir: Path) -> set[int]:
@@ -76,7 +70,7 @@ def identify_content(head: bytes) -> tuple[str, str] | None:
     if JADE_TAG_PATTERN.fullmatch(head[:4]):
         return head[1:4].decode("ascii"), "jade tag"
 
-    if head[:4] == b"RIFF" and head[8:12] == b"WAVE":
+    if head[:4] == RIFF_SIGNATURE and head[8:12] == RIFF_WAVE_FORM:
         return "wav", "riff header"
 
     if head.startswith(PNG_SIGNATURE):
@@ -164,7 +158,7 @@ def identify_pak(input_dir: Path, output_dir: Path) -> Counter[str]:
         entry, file = entries[index], files[index]
 
         with open(entries_dir / file, "rb") as entry_file:
-            entry_type, rule = identify(entry, entry_file.read(HEAD_SIZE), texture_keys)
+            entry_type, rule = identify(entry, entry_file.read(IDENTIFY_HEAD_SIZE), texture_keys)
 
         type_dir = output_dir / entry_type
         type_dir.mkdir(parents=True, exist_ok=True)
@@ -197,12 +191,7 @@ def main() -> None:
     parser.add_argument("--force", action="store_true", help="Identify again the paks that are already done")
     args = parser.parse_args()
 
-    input_dirs = sorted(path for path in LZ4_LAYER_DIR.glob(args.pak) if (path / TOC_FILE_NAME).exists())
-
-    if not input_dirs:
-        parser.error(f"no decompressed pak matches {args.pak!r} in {LZ4_LAYER_DIR} (run unpack_2_lz4.py first)")
-
-    for input_dir in input_dirs:
+    for input_dir in select_layer_paks(parser, LZ4_LAYER_DIR, args.pak, "tools.unpack.unpack_2_lz4"):
         output_dir = IDENTIFIED_LAYER_DIR / input_dir.name
 
         if (output_dir / INDEX_FILE_NAME).exists() and not args.force:
