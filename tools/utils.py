@@ -46,20 +46,27 @@ def check_game_dir(parser: argparse.ArgumentParser, game_dir: Path | None) -> Pa
     return game_dir
 
 
-def select_layer_paks(parser: argparse.ArgumentParser, layer_dir: Path, pattern: str, producer: str) -> list[Path]:
-    """Lists the complete pak folders of a layer (those holding a table of contents) matching a pattern, exits with
-    a usage error when there are none.
+def select_layer_paks(
+    parser: argparse.ArgumentParser,
+    layer_dir: Path,
+    pattern: str,
+    producer: str,
+    marker_file_name: str = TOC_FILE_NAME,
+) -> list[Path]:
+    """Lists the complete pak folders of a layer matching a pattern, exits with a usage error when there are none.
 
     Args:
         parser: The argument parser of the tool.
         layer_dir: The layer folder.
         pattern: A glob pattern on the pak names (e.g. "Text-*").
         producer: The module that produces the layer, suggested in the usage error.
+        marker_file_name: The file written last in a pak folder of the layer, its presence means the folder is
+            complete (the table of contents in layers 1 and 2).
 
     Returns:
         The matching pak folders, sorted by name.
     """
-    pak_dirs = sorted(path for path in layer_dir.glob(pattern) if (path / TOC_FILE_NAME).exists())
+    pak_dirs = sorted(path for path in layer_dir.glob(pattern) if (path / marker_file_name).exists())
 
     if not pak_dirs:
         parser.error(f"no pak matches {pattern!r} in {layer_dir} (run {producer} first)")

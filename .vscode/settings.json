@@ -15,7 +15,9 @@
     "clangd.checkUpdates": true,
     "clangd.onConfigChanged": "restart",
     // Addresses written as "+RVA" in the research notes (e.g. "+AEAC00")
-    "cSpell.ignoreRegExpList": ["\\+[0-9A-F]{4,}\\b"],
+    "cSpell.ignoreRegExpList": [
+        "\\+[0-9A-F]{4,}\\b"
+    ],
     "cSpell.words": [
         "binarized",
         "BPAK",
@@ -24,6 +26,8 @@
         "DCMAKE",
         "Denuvo's",
         "dinput",
+        "FOURCC",
+        "frombuffer",
         "gast",
         "IIIIQ",
         "ilammy",
@@ -32,6 +36,7 @@
         "MDISK",
         "moddable",
         "modloader",
+        "ndarray",
         "Paks",
         "partie",
         "pwsh",
@@ -42,6 +47,7 @@
         "softprops",
         "steamapps",
         "tdst",
+        "tobytes",
         "unbinarized",
         "Wwise",
         "Zycore",

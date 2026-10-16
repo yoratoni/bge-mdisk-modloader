@@ -116,18 +116,19 @@ references from the universe key (`0x71003FF9`) and parsing every format on the 
 
 What `tools.unpack.unpack_3_identify` identifies in `Resources.pak` (235,378 entries), by rule, with the two load
 traces of 2026-10-16 (73 worlds visited):
-| Rule          | Entries        | Types                                                                                                                                           |
-|---------------|----------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
-| Jade tag      | 71,465 (30.4%) | `.gao` 70,828 (game objects), `.wow` 637 (worlds, the world name at `+0x10`)                                                                    |
-| Structure     | 27,455 (11.7%) | `.oin` 17,415, `.map` 7,353, `.cob` 2,687 (see below)                                                                                           |
-| Load trace    | 16,693 (7.1%)  | Graphic objects or materials 5,922, `.oin` 2,490, `.ova` 2,490, `.trl` 1,305, link lists 946, `.map` 772, `.cob` 565, `.gol` 476, ...           |
-| Name          | 11,072 (4.7%)  | `.cgro` 11,071 (named `<decimal key>.cgro`, every one matches an existing key, likely the remaster's compiled graphic objects), `texParamTable` |
-| RIFF header   | 8,840 (3.8%)   | `.wav`, all XMA2 (`0x166`), mostly 32 kHz mono: the original Jade sounds in their Xbox format, the PC plays Wwise                               |
-| Reference     | 8,396 (3.6%)   | `.ofc` 3,502, `.act` 2,107, `.snk` 1,008, `.smd` 966, `.ova` 678, `.txg` 132, ...                                                               |
-| Texture table | 3,700 (1.6%)   | `.tex`, listed in `texParamTable`, they start with `0E 00 0x 00` (16 with `00 00 02 00`)                                                        |
-| Empty         | 750 (0.3%)     | No data                                                                                                                                         |
-| PNG signature | 15             | `.png`                                                                                                                                          |
-| Unknown       | 86,992 (37.0%) | Down from 139,536 before the references, the load traces and the structural rules, every new trace types more                                   |
+| Rule            | Entries        | Types                                                                                                                                           |
+|-----------------|----------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
+| Jade tag        | 71,465 (30.4%) | `.gao` 70,828 (game objects), `.wow` 637 (worlds, the world name at `+0x10`)                                                                    |
+| Structure       | 27,455 (11.7%) | `.oin` 17,415, `.map` 7,353, `.cob` 2,687 (see below)                                                                                           |
+| Load trace      | 16,693 (7.1%)  | Graphic objects or materials 5,922, `.oin` 2,490, `.ova` 2,490, `.trl` 1,305, link lists 946, `.map` 772, `.cob` 565, `.gol` 476, ...           |
+| Name            | 11,072 (4.7%)  | `.cgro` 11,071 (named `<decimal key>.cgro`, every one matches an existing key, likely the remaster's compiled graphic objects), `texParamTable` |
+| RIFF header     | 8,840 (3.8%)   | `.wav`, all XMA2 (`0x166`), mostly 32 kHz mono: the original Jade sounds in their Xbox format, the PC plays Wwise                               |
+| Reference       | 8,396 (3.6%)   | `.ofc` 3,502, `.act` 2,107, `.snk` 1,008, `.smd` 966, `.ova` 678, `.txg` 132, ...                                                               |
+| Texture table   | 3,700 (1.6%)   | `.tex`, listed in `texParamTable`, they start with `0E 00 0x 00` (the 16 TGA ones with `00 00 02 00`), see [Textures](#textures)                |
+| Empty           | 750 (0.3%)     | No data                                                                                                                                         |
+| Font descriptor | 82             | `.fod`, they start with `FONTDESC`                                                                                                              |
+| PNG signature   | 15             | `.png`                                                                                                                                          |
+| Unknown         | 86,910 (36.9%) | Down from 139,536 before the references, the load traces and the structural rules, every new trace types more                                   |
 
 The **structural rules** recognize an entry from its content and the types of the keys it holds, applied until they
 stop typing new entries, each one checked against the entries the other rules typed (none matches an entry of
@@ -151,6 +152,81 @@ The extra bytes are INI sections: `[Base]` on textures (2,666), `FogDensity=` on
 of the file it points at (object lists, action kits, AI models, sound banks, text group lists, ...). 4,911 entries of
 `Resources.pak` hold such records, they give an extension to 64,977 keys (a single key gets two different ones).
 Layer 3 uses them, along with the types of the [loader callbacks](#loader-callbacks) of the collected load traces.
+
+### Textures
+**Confirmed**: `tools.unpack.unpack_4_convert` converts all 3,700 textures of `Resources.pak` to DDS and TGA files,
+and these files with their metadata rebuild every entry byte-identically.
+
+A texture entry is its content followed by Jade's texture header (Jaded's `TEX_tdst_File_Desc`), its last 32 bytes:
+| Offset | Type        | Value                                                                                    |
+|--------|-------------|------------------------------------------------------------------------------------------|
+| `0x00` | `int32`     | Mark, `-1`                                                                               |
+| `0x04` | `uint16`    | Flags                                                                                    |
+| `0x06` | `uint8`     | Type: `13` cooked (3,684), `1` TGA (16)                                                  |
+| `0x07` | `uint8`     | Color format, `16` (1,652) or `32` (2,048), not the bit depth                            |
+| `0x08` | `uint16`    | Width                                                                                    |
+| `0x0A` | `uint16`    | Height                                                                                   |
+| `0x0C` | `uint32`    | Color (also in the `[Base]` extra bytes)                                                 |
+| `0x10` | `uint32`    | Font descriptor key: the `.fod` of the 75 font atlases (`FONTDESC`, see below), else `0` |
+| `0x14` | `uint32[3]` | Check codes `0xCAD01234`, `0x00FF00FF`, `0xC0DEC0DE`                                     |
+
+The **cooked content** (Virtuos's "Nori" texture sets, Ray1Map's `TEX_Content_Cooked`) comes first:
+| Offset | Type     | Value                                                                     |
+|--------|----------|---------------------------------------------------------------------------|
+| `0x00` | `uint16` | Version, `14`                                                             |
+| `0x02` | `uint32` | Set type (below)                                                          |
+| `0x06` | `uint32` | Map count, `0` stores the albedo only                                     |
+| `0x0A` | `uint32` | Compressed format: `1` RGBA8, `2` DXT, `3` ASTC (every PC texture is DXT) |
+| `0x0E` | `uint32` | Size of a map with alpha                                                  |
+| `0x12` | `uint32` | Size of a map without alpha                                               |
+| `0x16` | `bool`   | Alpha flag                                                                |
+| `0x17` | `uint32` | Mipmap count                                                              |
+
+Then, from `0x1B`:
+1. **The maps**, each a whole mipmap chain, largest level first. A map is DXT5 when it has alpha, DXT1 otherwise.
+   Only the albedo has alpha (when the flag is set), except in custom sets, where every map does.
+2. **The shader parameters**: one float for set types 1 to 5, two for type 6.
+3. **The custom shader name** (custom and type 6 sets): 64 bytes, null-terminated. The bytes after the null are
+   leftovers from the cooker's memory.
+
+The set types, with the maps they store:
+| Set type | Name     | Maps                                                                                              | Textures |
+|----------|----------|---------------------------------------------------------------------------------------------------|----------|
+| `0`      | Invalid  | Albedo, every one DXT1, the plain textures                                                        | 1,404    |
+| `1`      | Simple   | Albedo                                                                                            | 926      |
+| `2`      | Standard | Albedo, normal, spec/gloss/occlusion                                                              | 1,147    |
+| `3`      | Parallax | Albedo, normal, spec/gloss/occlusion, height                                                      | 10       |
+| `4`      | Emissive | Albedo, normal, spec/gloss/occlusion, emissive                                                    | 83       |
+| `5`      | Custom   | 1 to 4 maps, for a named shader (`SoftMesh`, `HologramMap`, `SimpleEmissive`, `IndoorWater`, ...) | 109      |
+| `6`      | Unnamed  | Albedo, for a named shader, two shader parameters                                                 | 5        |
+
+**Ray1Map swaps the last two maps**: it names the third map height/emissive and the fourth spec/gloss/occlusion,
+but the textures show the opposite:
+- **The third map** packs three channels. It's flat `(0, 0, 255)` when unused, and on a tile it darkens only in
+  blue in the grooves, so blue is occlusion.
+- **The fourth map** is the grayscale height map of the parallax sets, and the glow of the emissive sets (an eye).
+
+**Orientation**: every level is stored bottom-up, as in OpenGL. The converted DDS files are flipped to be top-down,
+block by block: the block rows are reversed, then the pixel rows inside every block. This flip is lossless and is
+its own inverse. Some levels have a height that isn't a multiple of 4: the small levels of the 290 textures whose
+size isn't a power of two (mostly 2560x1440, with 9 levels). Those levels end up shifted by up to 3 rows in the
+DDS, and are still exact once flipped back.
+
+Two kinds of entries need special handling:
+- **The 16 TGA textures** are plain uncompressed TGA files (24 or 32 bits, bottom-left origin) followed by the
+  header, and convert as they are. One of them (`0x4901F0EF`) is a collage of portrait photos, likely the original
+  team.
+- **`0x4900B368`** (2x2) holds a 128-byte map for an 8-byte chain. The rest is leftover memory from the cooker, a
+  UTF-16 path from Virtuos's build machine (`...LY_MS24_RC\P\Resources\CookingDir\WIN64\Textures\19000...`). The
+  converter keeps it in the metadata.
+
+**Font descriptors** (`.fod`, Jaded's `STR_b_LoadFontDescriptor`) are laid out as follows:
+- `"FONTDESC"`, then a `uint32` character count.
+- One record per glyph: a `uint32` character code, then 4 floats (`u0`, `v0`, `u1`, `v1`), the glyph's rectangle in
+  the atlas.
+- A `-1` at the end.
+
+Layer 3 types them from their signature.
 
 ### BigDir
 `Data/BigDir.jdproj` ships with the retail game:
@@ -296,7 +372,7 @@ The survey, every answer goes into this document:
 3. **Lookup path**: table of contents parsing, name or key to entry, read and decompress, and how `BIG_Read` /
    `LOA` sit on top. Settles keys vs CRC names.
 4. **BigDir**: whether loading loose files is reachable in retail.
-5. **Asset formats**: type the 139,536 unknown entries by walking the references from the universe key (Ray1Map's
+5. **Asset formats**: type the unknown entries by walking the references from the universe key (Ray1Map's
    loader as reference), and check whether the Jade files keep the original game's structures, which decides what
    replacing or adding an asset means (keys referenced inside other assets).
 6. **Other channels**: Wwise IO, shaders, Bink movies, `Config/*.spe`, `BGE_Build.ini` switches, AI2C scripts vs a

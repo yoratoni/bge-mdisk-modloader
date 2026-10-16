@@ -3,7 +3,8 @@
 Only rules that can't be wrong are applied, everything else lands in "unknown/". The remaster only tags a few Jade
 files with their type (".gao", ".wow"), the engine knows the type of every other key from the reference it follows.
 The rules, the first that applies wins:
-1. The entry itself: its name, its first bytes (Jade tag, RIFF, PNG), the table of texture parameters.
+1. The entry itself: its name, its first bytes (Jade tag, RIFF, PNG, font descriptor), the table of texture
+   parameters.
 2. The references to it: Jade's reference lists store the extension of every key they reference
    ([uint32 key][".gao"]), the extension most entries give it.
 3. The load traces collected in "workspace/traces/": the type of the loader callback the game loaded it with.
@@ -42,6 +43,8 @@ from tools.constants import (
     EMPTY_TYPE,
     ENTRIES_DIR_NAME,
     EXTRA_SUFFIX,
+    FONT_DESCRIPTOR_SIGNATURE,
+    FONT_DESCRIPTOR_TYPE,
     IDENTIFY_HEAD_SIZE,
     INDEX_FILE_NAME,
     JADE_REFERENCE_KEY_SIZE,
@@ -173,6 +176,9 @@ def identify_content(head: bytes) -> tuple[str, str] | None:
 
     if head.startswith(PNG_SIGNATURE):
         return "png", "png signature"
+
+    if head.startswith(FONT_DESCRIPTOR_SIGNATURE):
+        return FONT_DESCRIPTOR_TYPE, "font descriptor signature"
 
     return None
 

@@ -71,6 +71,7 @@ modules, run from the repository root with `python -m`:
 | `tools.unpack.unpack_1_bpak`     | `workspace/unpacked/1-bpak/`       | Unpacks every pak into its entries as stored and a `toc.json`                                            |
 | `tools.unpack.unpack_2_lz4`      | `workspace/unpacked/2-lz4/`        | Decompresses the entries of layer 1                                                                      |
 | `tools.unpack.unpack_3_identify` | `workspace/unpacked/3-identified/` | Sorts the entries of layer 2 into one folder per type (`unknown/` when not identified yet)               |
+| `tools.unpack.unpack_4_convert`  | `workspace/unpacked/4-converted/`  | Converts the textures of layer 3 to DDS (one per map, top-down) and TGA files, with their metadata       |
 | `tools.repack.repack_1_lz4`      | `workspace/unpacked/1-bpak/`       | Brings the entries edited in layer 2 back into layer 1, recompressed                                     |
 | `tools.repack.repack_2_bpak`     | `workspace/repacked/`              | Rebuilds the paks from layer 1 and checks they're byte-identical to the game's                           |
 | `tools.install_paks`             | The game folder                    | Installs the rebuilt paks (backing up the originals in `workspace/backups/`), or restores the originals  |
@@ -94,6 +95,7 @@ cp mdisk.example.toml mdisk.toml
 .venv/Scripts/python -m tools.unpack.unpack_1_bpak
 .venv/Scripts/python -m tools.unpack.unpack_2_lz4
 .venv/Scripts/python -m tools.unpack.unpack_3_identify
+.venv/Scripts/python -m tools.unpack.unpack_4_convert
 ```
 
 Layer 3 hard links its files from layer 2 (no extra disk space), so editing a file in one layer edits it in both.
@@ -118,9 +120,9 @@ Editing a pak goes the other way, edit the files in layer 2 then:
 ```
 
 The shared code sits next to the scripts: `tools/bpak.py` (the archive format), `tools/load_trace.py` (the load
-trace format), `tools/paths.py` (every location), `tools/constants.py` (every other constant) and `tools/utils.py`
-(helpers). The scripts follow Pylint, configured in `pyproject.toml`
-(`.venv/Scripts/python -m pylint tools`), and python-lz4 gets its types from the stubs in `typings/`.
+trace format), `tools/formats/` (the entry formats: textures, DDS), `tools/paths.py` (every location),
+`tools/constants.py` (every other constant) and `tools/utils.py` (helpers). The scripts follow Pylint, configured in
+`pyproject.toml` (`.venv/Scripts/python -m pylint tools`), and python-lz4 gets its types from the stubs in `typings/`.
 
 ## License
 Released under the [MIT License](LICENSE).

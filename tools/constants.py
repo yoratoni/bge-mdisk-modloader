@@ -1,7 +1,7 @@
 """Every constant of the tools that isn't a location (see "tools/paths.py" for those): layer files, performance
-settings, the BPAK format, the identification rules and the load trace.
+settings, the BPAK format, the identification rules, the load trace, the textures and the DDS format.
 
-The BPAK format and the load trace are documented in "docs/RESEARCH.md".
+The formats of the game are documented in "docs/RESEARCH.md".
 """
 
 import re
@@ -24,6 +24,12 @@ TOC_FILE_NAME = "toc.json"
 
 # The index written in every pak folder of layer 3
 INDEX_FILE_NAME = "identified.json"
+
+# The index written in every pak folder of layer 4
+CONVERTED_INDEX_FILE_NAME = "converted.json"
+
+# The suffix of the files holding what the converted files of an entry don't (layer 4)
+METADATA_SUFFIX = ".json"
 
 # The folder holding the entry files in every pak folder of layers 1 and 2
 ENTRIES_DIR_NAME = "entries"
@@ -86,6 +92,10 @@ RIFF_SIGNATURE = b"RIFF"
 RIFF_WAVE_FORM = b"WAVE"
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+# A font descriptor (Jaded's "STR_b_LoadFontDescriptor") starts with "FONTDESC", the glyphs of a font atlas texture
+FONT_DESCRIPTOR_SIGNATURE = b"FONTDESC"
+FONT_DESCRIPTOR_TYPE = "fod"
 
 # The table of texture parameters ("Resources.pak"), 64-byte records starting with the texture key
 TEXTURE_TABLE_NAME = "texParamTable"
@@ -216,5 +226,110 @@ CALLBACK_HEAD_SIZE = 4
 
 # The number of values shown per histogram in the callback report
 CALLBACK_REPORT_TOP_COUNT = 4
+
+# endregion
+
+# region Textures
+
+# The type of the entries holding textures (layer 3)
+TEXTURE_TYPE = "tex"
+
+# The Jade texture header (Jaded's "TEX_tdst_File_Desc"), at the end of the entry in unbinarized data: mark (-1),
+# flags, type, color format, width, height, color, font descriptor key and three check codes
+TEXTURE_HEADER = struct.Struct("<iHBBHHIIIII")
+TEXTURE_HEADER_MARK = -1
+TEXTURE_HEADER_CODES = (0xCAD01234, 0x00FF00FF, 0xC0DEC0DE)
+
+# The texture types found in the remaster (Ray1Map's "TexFileType"): nearly every texture is cooked, a few are still
+# plain TGA files (an uncompressed TGA followed by the texture header)
+TEXTURE_FILE_TYPE_TGA = 1
+TEXTURE_FILE_TYPE_COOKED = 13
+TGA_SUFFIX = ".tga"
+
+# The cooked content of a texture (Virtuos's "Nori" texture set, see Ray1Map's "TEX_Content_Cooked"): version (14),
+# set type, map count, compressed format, size with alpha, size without alpha, alpha flag, mipmap count
+COOKED_TEXTURE_HEADER = struct.Struct("<HIIIII?I")
+COOKED_TEXTURE_VERSION = 14
+
+# The compressed formats of the cooked textures
+COOKED_FORMAT_RGBA8 = 1
+COOKED_FORMAT_DXT = 2
+COOKED_FORMAT_ASTC = 3
+COOKED_FORMAT_NAMES: Final[dict[int, str]] = {
+    COOKED_FORMAT_RGBA8: "rgba8",
+    COOKED_FORMAT_DXT: "dxt",
+    COOKED_FORMAT_ASTC: "astc",
+}
+
+# The set types of the cooked textures (Ray1Map's "NoriTextureSetType"), the ones storing shader parameters
+COOKED_SET_TYPE_NAMES: Final[dict[int, str]] = {
+    0: "invalid",
+    1: "simple",
+    2: "standard",
+    3: "parallax",
+    4: "emissive",
+    5: "custom",
+    6: "type6",
+}
+COOKED_SET_TYPE_CUSTOM = 5
+COOKED_SET_TYPE_6 = 6
+
+# The maps of a texture set, in their stored order (a set with a map count of 0 only has its albedo), told apart by
+# their look since Ray1Map swaps the last two: the third map packs specular, gloss and occlusion (flat blue when
+# unused), the fourth is the height map of parallax sets or the emissive map of emissive sets
+COOKED_MAP_NAMES = ("albedo", "normal", "spec-gloss-occlusion", "height-emissive")
+
+# The shader parameters stored after the maps, and the custom shader name of the custom and type 6 sets
+COOKED_SHADER_PARAMETER = struct.Struct("<f")
+COOKED_SHADER_NAME_SIZE = 0x40
+
+# The bytes of a 4x4 block in DXT1 (no alpha) and DXT5 (alpha), and of a pixel in RGBA8
+DXT_BLOCK_PIXELS = 4
+DXT1_BLOCK_SIZE = 8
+DXT5_BLOCK_SIZE = 16
+RGBA8_PIXEL_SIZE = 4
+
+# The color block ending every DXT block: two colors, then the 2-bit color indices, one byte per pixel row
+DXT_COLOR_BLOCK_SIZE = 8
+DXT_COLOR_INDICES_OFFSET = 4
+
+# The alpha block starting a DXT5 block: two alphas, then the 3-bit alpha indices as a 48-bit integer, 12 bits per
+# pixel row
+DXT5_ALPHA_INDICES_OFFSET = 2
+DXT5_ALPHA_INDICES_SIZE = 6
+DXT5_ALPHA_ROW_BITS = 12
+
+# endregion
+
+# region DDS
+
+# The DDS file header: magic, size (124), flags, height, width, pitch or linear size, depth, mipmap count, 11 reserved
+# fields, then the pixel format (size (32), flags, FourCC, bit count, red, green, blue and alpha masks), then the
+# capabilities and a reserved field
+DDS_HEADER = struct.Struct("<4s7I44x2I4s5I5I")
+DDS_MAGIC = b"DDS "
+DDS_HEADER_SIZE = 124
+DDS_PIXEL_FORMAT_SIZE = 32
+
+# Header flags: capabilities, height, width, pixel format, mipmap count, and the pitch (uncompressed) or the linear
+# size (compressed) of the first level
+DDS_FLAGS = 0x1 | 0x2 | 0x4 | 0x1000 | 0x20000
+DDS_FLAG_PITCH = 0x8
+DDS_FLAG_LINEAR_SIZE = 0x80000
+
+# Pixel format flags and the FourCC of the compressed formats
+DDS_PIXEL_FORMAT_FOURCC = 0x4
+DDS_PIXEL_FORMAT_RGBA = 0x40 | 0x1
+DDS_FOURCC_DXT1 = b"DXT1"
+DDS_FOURCC_DXT5 = b"DXT5"
+
+# The RGBA8 masks, red in the first byte
+DDS_RGBA8_MASKS = (0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000)
+
+# Capabilities: a texture, with mipmaps (complex) when there are several levels
+DDS_CAPS_TEXTURE = 0x1000
+DDS_CAPS_MIPMAPS = 0x8 | 0x400000
+
+DDS_SUFFIX = ".dds"
 
 # endregion

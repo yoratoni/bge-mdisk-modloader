@@ -94,6 +94,9 @@ LZ4_LAYER_DIR = UNPACKED_DIR / "2-lz4"
 # Layer 3: the entries of layer 2 sorted by type
 IDENTIFIED_LAYER_DIR = UNPACKED_DIR / "3-identified"
 
+# Layer 4: the entries of layer 3 converted to common formats (textures to DDS, ...)
+CONVERTED_LAYER_DIR = UNPACKED_DIR / "4-converted"
+
 # The paks rebuilt from layer 1, to check it holds everything or to install them in the game
 REPACKED_DIR = WORKSPACE_DIR / "repacked"
 
