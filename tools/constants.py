@@ -244,7 +244,11 @@ TEXTURE_HEADER_CODES = (0xCAD01234, 0x00FF00FF, 0xC0DEC0DE)
 # plain TGA files (an uncompressed TGA followed by the texture header)
 TEXTURE_FILE_TYPE_TGA = 1
 TEXTURE_FILE_TYPE_COOKED = 13
-TGA_SUFFIX = ".tga"
+
+# The table of texture parameters holds a copy of the start of every texture header (mark to font descriptor key),
+# at this offset of the texture's record
+TEXTURE_RECORD_HEADER_OFFSET = 8
+TEXTURE_RECORD_HEADER_SIZE = 20
 
 # The cooked content of a texture (Virtuos's "Nori" texture set, see Ray1Map's "TEX_Content_Cooked"): version (14),
 # set type, map count, compressed format, size with alpha, size without alpha, alpha flag, mipmap count
@@ -331,5 +335,35 @@ DDS_CAPS_TEXTURE = 0x1000
 DDS_CAPS_MIPMAPS = 0x8 | 0x400000
 
 DDS_SUFFIX = ".dds"
+
+# Read in the DDS files of other tools: the DX10 extension header (DXGI format, resource dimension, misc flags, array
+# size, misc flags 2) following the header when the FourCC is "DX10", and the DXGI formats read here (as the pixel
+# format names of "tools.formats.dds")
+DDS_FOURCC_DX10 = b"DX10"
+DDS_DX10_HEADER = struct.Struct("<5I")
+DDS_DXGI_FORMATS: Final[dict[int, str]] = {
+    28: "rgba8",  # R8G8B8A8_UNORM
+    29: "rgba8",  # R8G8B8A8_UNORM_SRGB
+    71: "dxt1",  # BC1_UNORM
+    72: "dxt1",  # BC1_UNORM_SRGB
+    77: "dxt5",  # BC3_UNORM
+    78: "dxt5",  # BC3_UNORM_SRGB
+}
+DDS_PIXEL_FORMAT_RGB = 0x40
+DDS_CAPS2_CUBEMAP = 0x200
+DDS_DX10_MISC_TEXTURE_CUBE = 0x4
+
+# endregion
+
+# region TGA
+
+# The TGA file header: ID length, color map type, image type, color map start, length and depth, origin, width,
+# height, bits per pixel and descriptor (bit 5 set for a top-left origin)
+TGA_HEADER = struct.Struct("<BBBHHBHHHHBB")
+TGA_IMAGE_TYPE_TRUE_COLOR = 2
+TGA_BIT_DEPTHS = (24, 32)
+TGA_TOP_LEFT_ORIGIN = 0x20
+
+TGA_SUFFIX = ".tga"
 
 # endregion

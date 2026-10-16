@@ -62,7 +62,7 @@ There is **no anti-cheat** and the game is offline single-player, so modding car
 `version=Steam`), it's likely store specific.
 
 ### BPAK format
-**Confirmed**: the paks are rebuilt byte-identically from their unpacked entries (`tools.repack.repack_2_bpak`), the
+**Confirmed**: the paks are rebuilt byte-identically from their unpacked entries (`tools.repack.repack_3_bpak`), the
 layout is computed from scratch, so the rules below are the whole format. Every integer is little-endian.
 
 The header is `0x18` bytes:
@@ -142,8 +142,12 @@ another type):
 The 8-byte entries were the biggest block of unknowns (37,772): AI instances, collision maps (`01 FF 00 00` then a
 key) and about 1,100 entries of other shapes.
 
-`texParamTable` is an array of 3,700 records of 64 bytes, one per texture: the texture key first, then fields
-framed by the `0xCAD01234` (`+0x20`) and `0xC0DEC0DE` (`+0x30`) markers of the original Jade texture headers.
+`texParamTable` is an array of 3,700 records of 64 bytes, one per texture:
+- The texture key first.
+- At `+0x08`, a copy of the start of the [texture header](#textures), mark to font descriptor key (20 bytes). It's
+  identical in all 3,700 records, so a texture whose size changes needs its record updated too.
+- The three check codes at `+0x20`, `+0x28` and `+0x30`.
+- Parameters in the remaining bytes, mostly zeros (sometimes `1.0` or `7`).
 
 The extra bytes are INI sections: `[Base]` on textures (2,666), `FogDensity=` on lights (3,307), `[Performance]`
 (107), `[Procedural]` (36) and `[Anniversary]` (8).
@@ -155,7 +159,8 @@ Layer 3 uses them, along with the types of the [loader callbacks](#loader-callba
 
 ### Textures
 **Confirmed**: `tools.unpack.unpack_4_convert` converts all 3,700 textures of `Resources.pak` to DDS and TGA files,
-and these files with their metadata rebuild every entry byte-identically.
+and `tools.repack.repack_1_convert --check` rebuilds every entry byte-identically from these files and their
+metadata.
 
 A texture entry is its content followed by Jade's texture header (Jaded's `TEX_tdst_File_Desc`), its last 32 bytes:
 | Offset | Type        | Value                                                                                    |
@@ -245,15 +250,21 @@ from a BigDir is one of the most valuable open questions.
 ## Modding results
 In-game tests of edited paks, rebuilt with the tools (the edited entries recompressed with LZ4 high compression, so
 the rebuilt paks differ in size from the originals):
-| Date       | Pak              | Change                                                                    | Result                                                            |
-|------------|------------------|---------------------------------------------------------------------------|-------------------------------------------------------------------|
-| 2026-10-16 | `Text-fr.pak`    | `Nouvelle partie` → `MDISK ca marche` in entry `0x4900FDCA` (same length) | Shown in the main menu                                            |
-| 2026-10-16 | `Text-en_US.pak` | `New Game` → `MDISK!!!` in entry `0x4900FDC6` (same length)               | Rebuilt and installed with the French one, not checked in English |
-| 2026-10-16 | `Engine.pak`     | `FramePerf=0` → `1` in `BGE.ini`                                          | No FPS counter                                                    |
+| Date       | Pak              | Change                                                                                                | Result                                                            |
+|------------|------------------|-------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------|
+| 2026-10-16 | `Text-fr.pak`    | `Nouvelle partie` → `MDISK ca marche` in entry `0x4900FDCA` (same length)                             | Shown in the main menu                                            |
+| 2026-10-16 | `Text-en_US.pak` | `New Game` → `MDISK!!!` in entry `0x4900FDC6` (same length)                                           | Rebuilt and installed with the French one, not checked in English |
+| 2026-10-16 | `Engine.pak`     | `FramePerf=0` → `1` in `BGE.ini`                                                                      | No FPS counter                                                    |
+| 2026-10-17 | `Resources.pak`  | `MDISK` painted in magenta DXT blocks on the French logo `0x09001331`, in its top-down DDS of layer 4 | Shown on the French main menu logo, the right way up              |
 
 **The paks aren't checked**: a rebuilt pak with a recompressed entry and a different size loads, editing the paks
 in place works. The FPS counter result is inconclusive, either it's compiled out of the retail exe or that `BGE.ini`
 isn't the one that wins (`BGE.player.ini` is read after it), to check with a setting that's always visible.
+
+**Textures can be replaced**: a texture edited as a DDS file in layer 4 and brought back by the repack steps shows
+in game, which confirms the cooked layout, the bottom-up orientation and the flip of the converted DDS files. The
+main menu logo has one texture per language: `0x09001331` (French), `0x0900133A` (English), `0x09001343` and
+`0x0900134C` (Chinese), `0x09001355` (Korean), `0x0900135E` (Japanese).
 
 ## Engine file layer
 Leads only, nothing confirmed at runtime yet:

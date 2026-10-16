@@ -66,7 +66,7 @@ def main() -> None:
 
         if not pak_paths:
             parser.error(
-                f"no rebuilt pak matches {args.pak!r} in {REPACKED_DIR} (run tools.repack.repack_2_bpak --keep first)"
+                f"no rebuilt pak matches {args.pak!r} in {REPACKED_DIR} (run tools.repack.repack_3_bpak --keep first)"
             )
 
         for pak_path in pak_paths:

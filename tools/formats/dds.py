@@ -1,25 +1,34 @@
-"""DDS files, written around pixel data as is (DXT1, DXT5 or RGBA8), with every mipmap level.
+"""DDS files, written around pixel data as is (DXT1, DXT5 or RGBA8), with every mipmap level, and read back from
+other tools (legacy or DX10 header, BC1 / BC3 / R8G8B8A8 in DXGI terms).
 
 DDS files are top-down while the game stores its textures bottom-up, `flip_vertically` turns one into the other without
 decoding the blocks, so the pixel data is never re-encoded.
 """
 
+from dataclasses import dataclass
 from enum import Enum
+from typing import NamedTuple
 
 import numpy as np
 
 from tools.constants import (
+    DDS_CAPS2_CUBEMAP,
     DDS_CAPS_MIPMAPS,
     DDS_CAPS_TEXTURE,
+    DDS_DX10_HEADER,
+    DDS_DX10_MISC_TEXTURE_CUBE,
+    DDS_DXGI_FORMATS,
     DDS_FLAG_LINEAR_SIZE,
     DDS_FLAG_PITCH,
     DDS_FLAGS,
+    DDS_FOURCC_DX10,
     DDS_FOURCC_DXT1,
     DDS_FOURCC_DXT5,
     DDS_HEADER,
     DDS_HEADER_SIZE,
     DDS_MAGIC,
     DDS_PIXEL_FORMAT_FOURCC,
+    DDS_PIXEL_FORMAT_RGB,
     DDS_PIXEL_FORMAT_RGBA,
     DDS_PIXEL_FORMAT_SIZE,
     DDS_RGBA8_MASKS,
@@ -35,12 +44,55 @@ from tools.constants import (
 )
 
 
+class DdsError(ValueError):
+    """A DDS file that can't be read here."""
+
+
 class PixelFormat(Enum):
     """The pixel formats a DDS file can hold here."""
 
     DXT1 = "dxt1"
     DXT5 = "dxt5"
     RGBA8 = "rgba8"
+
+
+class DdsHeaderFields(NamedTuple):
+    """The fields of the DDS header, in the order of `DDS_HEADER`."""
+
+    magic: bytes
+    size: int
+    flags: int
+    height: int
+    width: int
+    pitch_or_linear_size: int
+    depth: int
+    mipmap_count: int
+    pixel_format_size: int
+    pixel_format_flags: int
+    fourcc: bytes
+    bit_count: int
+    red_mask: int
+    green_mask: int
+    blue_mask: int
+    alpha_mask: int
+    caps: int
+    caps2: int
+    caps3: int
+    caps4: int
+    reserved: int
+
+
+@dataclass
+class DdsImage:
+    """The image of a DDS file."""
+
+    pixel_format: PixelFormat
+    width: int
+    height: int
+    mipmap_count: int
+
+    # Every mipmap level after the previous one, top-down
+    data: bytes
 
 
 def level_dimensions(width: int, height: int, level: int) -> tuple[int, int]:
@@ -90,9 +142,7 @@ def mipmap_chain_size(pixel_format: PixelFormat, width: int, height: int, mipmap
     Returns:
         The size in bytes.
     """
-    return sum(
-        level_size(pixel_format, *level_dimensions(width, height, level)) for level in range(mipmap_count)
-    )
+    return sum(level_size(pixel_format, *level_dimensions(width, height, level)) for level in range(mipmap_count))
 
 
 def flip_alpha_indices(blocks: np.ndarray, pixel_rows: int) -> None:
@@ -231,3 +281,102 @@ def build_dds(pixel_format: PixelFormat, width: int, height: int, mipmap_count: 
     )
 
     return header + data
+
+
+def read_dx10_pixel_format(data: bytes) -> PixelFormat:
+    """Reads the pixel format of the DX10 extension header, which follows the header.
+
+    Args:
+        data: The DDS file.
+
+    Returns:
+        The pixel format.
+
+    Raises:
+        DdsError: If the format isn't one read here, or if the file holds a cube map or an array.
+    """
+    if len(data) < DDS_HEADER.size + DDS_DX10_HEADER.size:
+        raise DdsError("too short for its DX10 header")
+
+    dxgi_format, _, misc_flags, array_size, _ = DDS_DX10_HEADER.unpack_from(data, DDS_HEADER.size)
+
+    if misc_flags & DDS_DX10_MISC_TEXTURE_CUBE or array_size > 1:
+        raise DdsError("a cube map or a texture array, a single texture is expected")
+
+    if dxgi_format not in DDS_DXGI_FORMATS:
+        raise DdsError(f"DXGI format {dxgi_format}, save it as BC1 (DXT1), BC3 (DXT5) or R8G8B8A8")
+
+    return PixelFormat(DDS_DXGI_FORMATS[dxgi_format])
+
+
+def read_legacy_pixel_format(flags: int, fourcc: bytes, bit_count: int, masks: tuple[int, ...]) -> PixelFormat:
+    """Reads the pixel format of the header itself.
+
+    Args:
+        flags: The pixel format flags.
+        fourcc: The FourCC, for the compressed formats.
+        bit_count: The bits per pixel, for the uncompressed formats.
+        masks: The red, green, blue and alpha masks, for the uncompressed formats.
+
+    Returns:
+        The pixel format.
+
+    Raises:
+        DdsError: If the format isn't one read here.
+    """
+    if flags & DDS_PIXEL_FORMAT_FOURCC:
+        if fourcc == DDS_FOURCC_DXT1:
+            return PixelFormat.DXT1
+
+        if fourcc == DDS_FOURCC_DXT5:
+            return PixelFormat.DXT5
+
+        raise DdsError(f"FourCC {fourcc.decode('latin-1')!r}, save it as DXT1 (BC1) or DXT5 (BC3)")
+
+    if flags & DDS_PIXEL_FORMAT_RGB and bit_count == RGBA8_PIXEL_SIZE * 8 and masks == DDS_RGBA8_MASKS:
+        return PixelFormat.RGBA8
+
+    raise DdsError("an uncompressed format other than RGBA8, save it as DXT1 (BC1) or DXT5 (BC3)")
+
+
+def parse_dds(data: bytes) -> DdsImage:
+    """Parses a DDS file holding a single 2D texture.
+
+    Args:
+        data: The DDS file.
+
+    Returns:
+        The image.
+
+    Raises:
+        DdsError: If the file isn't a DDS file this module reads, or if it holds less or more than its mipmap chain.
+    """
+    if len(data) < DDS_HEADER.size or not data.startswith(DDS_MAGIC):
+        raise DdsError("not a DDS file")
+
+    header = DdsHeaderFields._make(DDS_HEADER.unpack_from(data))
+
+    if header.caps2 & DDS_CAPS2_CUBEMAP:
+        raise DdsError("a cube map, a single texture is expected")
+
+    data_offset = DDS_HEADER.size
+
+    if header.pixel_format_flags & DDS_PIXEL_FORMAT_FOURCC and header.fourcc == DDS_FOURCC_DX10:
+        pixel_format = read_dx10_pixel_format(data)
+        data_offset += DDS_DX10_HEADER.size
+    else:
+        masks = (header.red_mask, header.green_mask, header.blue_mask, header.alpha_mask)
+        pixel_format = read_legacy_pixel_format(header.pixel_format_flags, header.fourcc, header.bit_count, masks)
+
+    # Some tools leave the mipmap count at 0 when there's a single level
+    mipmap_count = max(1, header.mipmap_count)
+    chain_size = mipmap_chain_size(pixel_format, header.width, header.height, mipmap_count)
+    stored_size = len(data) - data_offset
+
+    if stored_size != chain_size:
+        raise DdsError(
+            f"holds {stored_size} bytes of pixel data, {chain_size} expected for {header.width}x{header.height} "
+            f"{pixel_format.value} with {mipmap_count} levels"
+        )
+
+    return DdsImage(pixel_format, header.width, header.height, mipmap_count, data[data_offset:])

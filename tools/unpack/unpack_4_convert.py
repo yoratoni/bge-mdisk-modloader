@@ -24,54 +24,23 @@ from typing import Any
 
 from tools.constants import (
     CONVERTED_INDEX_FILE_NAME,
-    COOKED_FORMAT_DXT,
-    COOKED_FORMAT_NAMES,
-    COOKED_FORMAT_RGBA8,
     COOKED_MAP_NAMES,
-    DDS_SUFFIX,
     INDEX_FILE_NAME,
-    METADATA_SUFFIX,
     TEXTURE_FILE_TYPE_TGA,
     TEXTURE_TYPE,
-    TGA_SUFFIX,
     WORKER_THREADS,
 )
-from tools.formats.dds import PixelFormat, build_dds, flip_vertically, mipmap_chain_size
-from tools.formats.texture import (
-    Texture,
-    TextureError,
-    TextureHeader,
-    parse_header,
-    parse_texture,
-    parse_tga_texture,
+from tools.formats.converted_texture import (
+    cooked_metadata,
+    map_file_name,
+    metadata_file_name,
+    tga_file_name,
+    tga_metadata,
 )
+from tools.formats.dds import PixelFormat, build_dds, flip_vertically, mipmap_chain_size
+from tools.formats.texture import Texture, TextureError, parse_header, parse_texture, parse_tga_texture
 from tools.paths import CONVERTED_LAYER_DIR, IDENTIFIED_LAYER_DIR
 from tools.utils import select_layer_paks
-
-
-def map_pixel_format(texture: Texture, index: int) -> PixelFormat:
-    """Returns the DDS pixel format of a map.
-
-    Args:
-        texture: The texture.
-        index: The index of the map.
-
-    Returns:
-        The pixel format.
-
-    Raises:
-        TextureError: If the compressed format can't be written to DDS (ASTC).
-    """
-    compressed_format = texture.layout.compressed_format
-
-    if compressed_format == COOKED_FORMAT_DXT:
-        return PixelFormat.DXT5 if texture.layout.map_has_alpha(index) else PixelFormat.DXT1
-
-    if compressed_format == COOKED_FORMAT_RGBA8:
-        return PixelFormat.RGBA8
-
-    format_name = COOKED_FORMAT_NAMES.get(compressed_format, str(compressed_format))
-    raise TextureError(f"unsupported compressed format ({format_name})")
 
 
 def split_map_chains(texture: Texture, pixel_formats: list[PixelFormat]) -> tuple[list[bytes], dict[str, str]]:
@@ -109,63 +78,6 @@ def split_map_chains(texture: Texture, pixel_formats: list[PixelFormat]) -> tupl
     return chains, padding
 
 
-def header_metadata(header: TextureHeader) -> dict[str, int]:
-    """Describes Jade's texture header.
-
-    Args:
-        header: The header.
-
-    Returns:
-        The fields, as JSON values.
-    """
-    return {
-        "flags": header.flags,
-        "fileType": header.file_type,
-        "colorFormat": header.color_format,
-        "width": header.width,
-        "height": header.height,
-        "color": header.color,
-        "fontKey": header.font_key,
-    }
-
-
-def cooked_metadata(texture: Texture, description: str, padding: dict[str, str]) -> dict[str, Any]:
-    """Describes the fields of a cooked texture the DDS files don't hold.
-
-    Args:
-        texture: The texture.
-        description: A short description of the texture.
-        padding: The bytes the maps hold after their mipmap chain, as hex by map name.
-
-    Returns:
-        The fields, as JSON values.
-    """
-    layout = texture.layout
-    metadata: dict[str, Any] = {
-        "description": description,
-        "header": header_metadata(texture.header),
-        "layout": {
-            "setType": layout.set_type,
-            "mapCount": layout.map_count,
-            "compressedFormat": layout.compressed_format,
-            "sizeWithAlpha": layout.size_with_alpha,
-            "sizeWithoutAlpha": layout.size_without_alpha,
-            "hasAlpha": layout.has_alpha,
-            "mipmapCount": layout.mipmap_count,
-        },
-        "shaderParameters": texture.shader_parameters,
-    }
-
-    if texture.shader_name_field is not None:
-        metadata["shaderName"] = texture.shader_name
-        metadata["shaderNameField"] = texture.shader_name_field.hex()
-
-    if padding:
-        metadata["padding"] = padding
-
-    return metadata
-
-
 def write_dds_file(texture: Texture, pixel_format: PixelFormat, chain: bytes, dds_path: Path) -> None:
     """Writes the DDS file of one map, flipped to be top-down.
 
@@ -195,13 +107,12 @@ def convert_cooked_texture(data: bytes, output_dir: Path, base_name: str) -> tup
         TextureError: If the entry isn't a cooked texture this layer can convert.
     """
     texture = parse_texture(data)
-    pixel_formats = [map_pixel_format(texture, index) for index in range(len(texture.maps))]
+    pixel_formats = [texture.layout.map_pixel_format(index) for index in range(len(texture.maps))]
     chains, padding = split_map_chains(texture, pixel_formats)
     files: list[str] = []
 
     for index, (chain, pixel_format) in enumerate(zip(chains, pixel_formats)):
-        map_suffix = "" if index == 0 else f".{COOKED_MAP_NAMES[index]}"
-        dds_path = output_dir / f"{base_name}{map_suffix}{DDS_SUFFIX}"
+        dds_path = output_dir / map_file_name(base_name, index)
         write_dds_file(texture, pixel_format, chain, dds_path)
         files.append(dds_path.name)
 
@@ -225,10 +136,10 @@ def convert_tga_texture(data: bytes, output_dir: Path, base_name: str) -> tuple[
         The names of the written files, and the metadata of the texture.
     """
     header, tga_file = parse_tga_texture(data)
-    tga_path = output_dir / f"{base_name}{TGA_SUFFIX}"
+    tga_path = output_dir / tga_file_name(base_name)
     tga_path.write_bytes(tga_file)
 
-    return [tga_path.name], {"description": "tga", "header": header_metadata(header)}
+    return [tga_path.name], tga_metadata(header)
 
 
 def convert_texture(source_path: Path, output_dir: Path, base_name: str) -> tuple[list[str], str]:
@@ -252,7 +163,7 @@ def convert_texture(source_path: Path, output_dir: Path, base_name: str) -> tupl
     else:
         files, metadata = convert_cooked_texture(data, output_dir, base_name)
 
-    metadata_path = output_dir / f"{base_name}{METADATA_SUFFIX}"
+    metadata_path = output_dir / metadata_file_name(base_name)
     metadata_path.write_text(json.dumps(metadata, indent=1), encoding="utf-8")
     files.append(metadata_path.name)
 

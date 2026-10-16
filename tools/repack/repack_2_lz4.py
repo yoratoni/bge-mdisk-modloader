@@ -9,6 +9,7 @@ Run "tools.unpack.unpack_1_bpak --force" (then the next layers) on a pak to go b
 """
 
 import argparse
+from collections.abc import Callable
 from pathlib import Path
 
 import lz4.block
@@ -33,18 +34,22 @@ def read_layer_1_content(entry: PakEntry, path: Path) -> bytes:
     return lz4.block.decompress(data, uncompressed_size=entry.size) if entry.is_compressed else data
 
 
-def is_edited(layer_2_file: Path, layer_2_written_time: float, original_content: bytes) -> bool:
+def is_edited(layer_2_file: Path, layer_2_written_time: float, read_original_content: Callable[[], bytes]) -> bool:
     """Checks whether a layer 2 file was edited.
 
     Args:
         layer_2_file: The file in layer 2.
         layer_2_written_time: The modification time of the layer 2 table of contents, written after every file.
-        original_content: The original content of the file, from layer 1.
+        read_original_content: Reads the original content of the file from layer 1, only called for the files
+            modified after layer 2 was written (reading every entry of "Resources.pak" would take minutes).
 
     Returns:
         True if the file was modified after layer 2 was written and differs from the original content.
     """
-    return layer_2_file.stat().st_mtime > layer_2_written_time and layer_2_file.read_bytes() != original_content
+    if layer_2_file.stat().st_mtime <= layer_2_written_time:
+        return False
+
+    return layer_2_file.read_bytes() != read_original_content()
 
 
 def repack_entry(entry: PakEntry, layer_1_file: Path, layer_2_file: Path, layer_2_written_time: float) -> str | None:
@@ -60,7 +65,7 @@ def repack_entry(entry: PakEntry, layer_1_file: Path, layer_2_file: Path, layer_
     Returns:
         A description of the change, None if the entry wasn't edited.
     """
-    if not is_edited(layer_2_file, layer_2_written_time, read_layer_1_content(entry, layer_1_file)):
+    if not is_edited(layer_2_file, layer_2_written_time, lambda: read_layer_1_content(entry, layer_1_file)):
         return None
 
     original_size = entry.size
@@ -99,7 +104,7 @@ def repack_extra(
     layer_1_extra_file = layer_1_entries_dir / extra_file_name
     layer_2_extra_file = layer_2_entries_dir / extra_file_name
 
-    if not is_edited(layer_2_extra_file, layer_2_written_time, layer_1_extra_file.read_bytes()):
+    if not is_edited(layer_2_extra_file, layer_2_written_time, layer_1_extra_file.read_bytes):
         return None
 
     content = layer_2_extra_file.read_bytes()

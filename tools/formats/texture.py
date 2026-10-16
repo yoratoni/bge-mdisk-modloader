@@ -15,6 +15,9 @@ The pixel data of both is stored bottom-up.
 from dataclasses import dataclass
 
 from tools.constants import (
+    COOKED_FORMAT_DXT,
+    COOKED_FORMAT_NAMES,
+    COOKED_FORMAT_RGBA8,
     COOKED_MAP_NAMES,
     COOKED_SET_TYPE_6,
     COOKED_SET_TYPE_CUSTOM,
@@ -29,6 +32,7 @@ from tools.constants import (
     TEXTURE_HEADER_CODES,
     TEXTURE_HEADER_MARK,
 )
+from tools.formats.dds import PixelFormat
 
 
 class TextureError(ValueError):
@@ -87,6 +91,41 @@ class CookedLayout:
         """
         return self.size_with_alpha if self.map_has_alpha(index) else self.size_without_alpha
 
+    def map_pixel_format(self, index: int) -> PixelFormat:
+        """Returns the pixel format of a map, as in a DDS file.
+
+        Args:
+            index: The index of the map.
+
+        Returns:
+            The pixel format.
+
+        Raises:
+            TextureError: If the compressed format can't be held in a DDS file here (ASTC).
+        """
+        if self.compressed_format == COOKED_FORMAT_DXT:
+            return PixelFormat.DXT5 if self.map_has_alpha(index) else PixelFormat.DXT1
+
+        if self.compressed_format == COOKED_FORMAT_RGBA8:
+            return PixelFormat.RGBA8
+
+        format_name = COOKED_FORMAT_NAMES.get(self.compressed_format, str(self.compressed_format))
+        raise TextureError(f"unsupported compressed format ({format_name})")
+
+    @property
+    def shader_parameter_count(self) -> int:
+        """The number of shader parameters stored after the maps, one for every known set type but the invalid one,
+        two for type 6."""
+        if self.set_type not in COOKED_SET_TYPE_NAMES or self.set_type == 0:
+            return 0
+
+        return 2 if self.set_type == COOKED_SET_TYPE_6 else 1
+
+    @property
+    def has_shader_name(self) -> bool:
+        """Whether a custom shader name follows the shader parameters (custom and type 6 sets)."""
+        return self.set_type in (COOKED_SET_TYPE_CUSTOM, COOKED_SET_TYPE_6)
+
 
 @dataclass
 class Texture:
@@ -111,7 +150,39 @@ class Texture:
         if self.shader_name_field is None:
             return None
 
-        return self.shader_name_field.split(b"\0", 1)[0].decode("latin-1")
+        return decode_shader_name(self.shader_name_field)
+
+
+def decode_shader_name(shader_name_field: bytes) -> str:
+    """Decodes a custom shader name field.
+
+    Args:
+        shader_name_field: The field as stored.
+
+    Returns:
+        The name, up to the terminating null.
+    """
+    return shader_name_field.split(b"\0", 1)[0].decode("latin-1")
+
+
+def encode_shader_name(shader_name: str) -> bytes:
+    """Encodes a custom shader name into its field.
+
+    Args:
+        shader_name: The name.
+
+    Returns:
+        The field, the name padded with nulls.
+
+    Raises:
+        TextureError: If the name doesn't fit in the field with its terminating null.
+    """
+    encoded_name = shader_name.encode("latin-1")
+
+    if len(encoded_name) >= COOKED_SHADER_NAME_SIZE:
+        raise TextureError(f"shader name too long ({shader_name!r}, {COOKED_SHADER_NAME_SIZE - 1} characters at most)")
+
+    return encoded_name.ljust(COOKED_SHADER_NAME_SIZE, b"\0")
 
 
 def parse_header(data: bytes) -> TextureHeader:
@@ -139,32 +210,27 @@ def parse_header(data: bytes) -> TextureHeader:
     return TextureHeader(flags, file_type, color_format, width, height, color, font_key)
 
 
-def parse_shader_fields(data: bytes, position: int, set_type: int) -> tuple[list[float], bytes | None, int]:
+def parse_shader_fields(data: bytes, position: int, layout: CookedLayout) -> tuple[list[float], bytes | None, int]:
     """Parses the shader parameters stored after the maps of a texture set.
 
     Args:
         data: The entry.
         position: The position right after the maps.
-        set_type: The set type, which decides the fields stored.
+        layout: The layout of the texture, its set type decides the fields stored.
 
     Returns:
         The shader parameters, the custom shader name field (None when the set has none) and the position after them.
     """
-    parameter_count = 0
-
-    if set_type in COOKED_SET_TYPE_NAMES and set_type != 0:
-        parameter_count = 2 if set_type == COOKED_SET_TYPE_6 else 1
-
     parameters = []
 
-    for _ in range(parameter_count):
+    for _ in range(layout.shader_parameter_count):
         (parameter,) = COOKED_SHADER_PARAMETER.unpack_from(data, position)
         parameters.append(parameter)
         position += COOKED_SHADER_PARAMETER.size
 
     shader_name_field = None
 
-    if set_type in (COOKED_SET_TYPE_CUSTOM, COOKED_SET_TYPE_6):
+    if layout.has_shader_name:
         shader_name_field = data[position : position + COOKED_SHADER_NAME_SIZE]
         position += COOKED_SHADER_NAME_SIZE
 
@@ -202,7 +268,7 @@ def parse_texture(data: bytes) -> Texture:
         maps.append(data[position : position + size])
         position += size
 
-    parameters, shader_name_field, position = parse_shader_fields(data, position, layout.set_type)
+    parameters, shader_name_field, position = parse_shader_fields(data, position, layout)
 
     header_position = len(data) - TEXTURE_HEADER.size
 
@@ -230,3 +296,80 @@ def parse_tga_texture(data: bytes) -> tuple[TextureHeader, bytes]:
         raise TextureError(f"texture type {header.file_type}, not TGA")
 
     return header, data[: len(data) - TEXTURE_HEADER.size]
+
+
+def build_header(header: TextureHeader) -> bytes:
+    """Builds Jade's texture header.
+
+    Args:
+        header: The header.
+
+    Returns:
+        The header bytes, with its mark and check codes.
+    """
+    return TEXTURE_HEADER.pack(
+        TEXTURE_HEADER_MARK,
+        header.flags,
+        header.file_type,
+        header.color_format,
+        header.width,
+        header.height,
+        header.color,
+        header.font_key,
+        *TEXTURE_HEADER_CODES,
+    )
+
+
+def build_texture(texture: Texture) -> bytes:
+    """Builds a cooked texture entry, the reverse of `parse_texture`.
+
+    Args:
+        texture: The texture.
+
+    Returns:
+        The entry.
+
+    Raises:
+        TextureError: If the maps or the shader fields don't match what the layout calls for.
+    """
+    layout = texture.layout
+
+    if len(texture.maps) != layout.stored_map_count:
+        raise TextureError(f"{len(texture.maps)} maps, the layout stores {layout.stored_map_count}")
+
+    for index, map_data in enumerate(texture.maps):
+        if len(map_data) != layout.map_size(index):
+            raise TextureError(
+                f"{COOKED_MAP_NAMES[index]} holds {len(map_data)} bytes, the layout gives it {layout.map_size(index)}"
+            )
+
+    if len(texture.shader_parameters) != layout.shader_parameter_count:
+        raise TextureError(
+            f"{len(texture.shader_parameters)} shader parameters, the set type stores "
+            f"{layout.shader_parameter_count}"
+        )
+
+    if (texture.shader_name_field is not None) != layout.has_shader_name:
+        raise TextureError("a custom shader name on a set type without one, or the reverse")
+
+    parts = [
+        COOKED_TEXTURE_HEADER.pack(
+            COOKED_TEXTURE_VERSION,
+            layout.set_type,
+            layout.map_count,
+            layout.compressed_format,
+            layout.size_with_alpha,
+            layout.size_without_alpha,
+            layout.has_alpha,
+            layout.mipmap_count,
+        ),
+        *texture.maps,
+        *(COOKED_SHADER_PARAMETER.pack(parameter) for parameter in texture.shader_parameters),
+    ]
+
+    if texture.shader_name_field is not None:
+        parts.append(texture.shader_name_field)
+
+    parts.append(build_header(texture.header))
+
+    return b"".join(parts)
