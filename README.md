@@ -5,6 +5,10 @@
   <p align="center">A mod loader for Beyond Good & Evil 20th anniversary edition.</p>
 </p>
 
+> Note: I'm not a fan but yes, i'm using AI a bit for lookups and docs, I had my share of looking at
+> HxD for days and days, as you know, reverse engineering is a tedious process and having AI
+> assistance helps streamline some of the more repetitive tasks.
+
 ## Status
 Early research phase, nothing usable for players yet. The goal is to make the 20th Anniversary Edition actually
 moddable, previous community tools stopped at extracting its files.
