@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Bundles and installers
+dist/
+
+# Caches
+*.tsbuildinfo
+.eslintcache
+.vite/
+
+# Logs
+*.log

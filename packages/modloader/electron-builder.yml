@@ -1,0 +1,35 @@
+appId: com.yoratoni.mdisk-modloader
+productName: MDisk Mod Loader
+copyright: Copyright © ${author}
+
+directories:
+    output: dist/release
+    buildResources: resources
+
+files:
+    - dist/app/**/*
+    - package.json
+    - "!**/*.map"
+
+asar: true
+
+# The game runs on Windows, and on Linux through Proton (Steam Deck)
+win:
+    target:
+        - target: nsis
+          arch: [x64]
+    artifactName: MDiskModLoader-${version}-win-${arch}.${ext}
+
+nsis:
+    oneClick: false
+    perMachine: false
+    allowElevation: true
+    allowToChangeInstallationDirectory: true
+    deleteAppDataOnUninstall: false
+
+linux:
+    target:
+        - target: AppImage
+          arch: [x64]
+    category: Game
+    artifactName: MDiskModLoader-${version}-linux-${arch}.${ext}

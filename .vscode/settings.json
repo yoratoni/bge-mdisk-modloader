@@ -14,17 +14,41 @@
     // clangd >= 20 and a stale binary fails loudly inside the MSVC STL rather than degrading
     "clangd.checkUpdates": true,
     "clangd.onConfigChanged": "restart",
+    // The Electron app ("packages/modloader") formats with Biome and lints with Nitpicker on save, from its own
+    // configurations, JSON is left out so the C++ side's files keep their own formatting
+    "[typescript][typescriptreact][javascript][css]": {
+        "editor.codeActionsOnSave": {
+            "source.action.useSortedAttributes.biome": "explicit",
+            "source.action.useSortedKeys.biome": "explicit",
+            "source.action.useSortedProperties.biome": "explicit",
+            "source.fixAll.biome": "explicit",
+            "source.fixAll.eslint": "explicit",
+            "source.organizeImports.biome": "explicit"
+        },
+        "editor.defaultFormatter": "biomejs.biome",
+        "editor.formatOnSave": true
+    },
+    "eslint.workingDirectories": [
+        {
+            "mode": "auto"
+        }
+    ],
+    "javascript.preferences.importModuleSpecifier": "shortest",
+    "typescript.preferences.importModuleSpecifier": "non-relative",
     // Addresses written as "+RVA" in the research notes (e.g. "+AEAC00")
     "cSpell.ignoreRegExpList": [
         "\\+[0-9A-F]{4,}\\b"
     ],
     "cSpell.words": [
+        "asar",
         "BBBHHBHHHHBB",
         "binarized",
         "BPAK",
         "cgro",
         "choco",
         "CUBEMAP",
+        "cybearl",
+        "cypack",
         "DCMAKE",
         "Denuvo's",
         "dinput",
@@ -40,6 +64,7 @@
         "moddable",
         "modloader",
         "ndarray",
+        "nsis",
         "Paks",
         "partie",
         "pwsh",

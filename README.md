@@ -13,12 +13,13 @@
 Early research phase, nothing usable for players yet. The goal is to make the 20th Anniversary Edition actually
 moddable, previous community tools stopped at extracting its files.
 
-The project is split in packages, each one with its own `CMakeLists.txt`, sources, dependencies and tests:
-| Package           | Output                      | Role                                                                                               |
-|-------------------|-----------------------------|----------------------------------------------------------------------------------------------------|
-| `packages/asi`    | `MDiskModLoader.asi`        | The in-game toolbox (debugging and runtime injection), loaded by Ultimate ASI Loader, Windows only |
-| `packages/bpak`   | Library (planned)           | The `.pak` archive format (read, write, compression), shared by the other packages, portable       |
-| `packages/packer` | `MDiskPacker.exe` (planned) | The repacker, unpacks and repacks the game's `Data/Paks/*.pak` archives to apply mods, portable    |
+The project is split in packages, each one with its own build, sources, dependencies and tests:
+| Package              | Output                              | Role                                                                                                                          |
+|----------------------|-------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| `packages/asi`       | `MDiskModLoader.asi`                | The in-game toolbox (debugging and runtime injection), loaded by Ultimate ASI Loader, Windows only                            |
+| `packages/modloader` | MDisk Mod Loader (work in progress) | The desktop app installing the mods, Electron, Windows and Linux (Steam Deck), see its [README](packages/modloader/README.md) |
+| `packages/bpak`      | Library (planned)                   | The `.pak` archive format (read, write, compression), shared by the other packages, portable                                  |
+| `packages/packer`    | `MDiskPacker.exe` (planned)         | The repacker, unpacks and repacks the game's `Data/Paks/*.pak` archives to apply mods, portable                               |
 
 The name comes from the MDisks of the game, and from Mdisk, an extract/build tool for the original game's
 `sally_clean.bf` that got lost years ago.
@@ -58,8 +59,9 @@ Every binary lands at the root of the build directory. Packages can be turned of
 cmake --preset default -DMDISK_BUILD_ASI=OFF
 ```
 
-The version is defined once, in the `project()` call of the root `CMakeLists.txt`, and shared by every package.
-Pushing a `vX.Y.Z` tag matching it builds, tests and publishes the release ZIP through the GitHub workflow.
+The version is defined in the `project()` call of the root `CMakeLists.txt`, shared by every C++ package, and
+repeated in `packages/modloader/package.json` for the app. Pushing a `vX.Y.Z` tag matching it builds, tests and
+publishes the release ZIP through the GitHub workflow.
 
 ## Research tools
 The Python package in `tools/` copies the game files into the `workspace/` folder (ignored by git) and unpacks them

@@ -1,0 +1,13 @@
+@theme {
+    /*
+     * Placeholder tokens for the skeleton, the custom UI replaces them with its own.
+     */
+    --color-background: #111114;
+    --color-foreground: #e6e6ea;
+    --color-foreground-muted: #8b8b94;
+    --color-title-bar: #18181c;
+    --color-control-hover: #2a2a30;
+    --color-control-close-hover: #c42b1c;
+
+    --font-sans: system-ui, sans-serif;
+}

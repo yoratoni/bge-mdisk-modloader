@@ -1,0 +1,91 @@
+{
+    "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+    "files": {
+        "ignoreUnknown": true,
+        "includes": ["**", "!node_modules", "!dist", "!.vscode"]
+    },
+    "assist": {
+        "actions": {
+            "source": {
+                "organizeImports": "on",
+                "useSortedAttributes": "off",
+                "useSortedKeys": "off",
+                "useSortedProperties": "off"
+            }
+        }
+    },
+    "formatter": {
+        "enabled": true,
+        "indentStyle": "space",
+        "indentWidth": 4
+    },
+    "javascript": {
+        "formatter": {
+            "arrowParentheses": "asNeeded",
+            "bracketSpacing": true,
+            "enabled": true,
+            "jsxQuoteStyle": "double",
+            "lineEnding": "lf",
+            "lineWidth": 120,
+            "quoteStyle": "double",
+            "semicolons": "asNeeded",
+            "trailingCommas": "all"
+        },
+        "jsxRuntime": "transparent"
+    },
+    "css": {
+        "parser": {
+            "tailwindDirectives": true
+        }
+    },
+    "json": {
+        "formatter": {
+            "enabled": true
+        }
+    },
+    "linter": {
+        "enabled": true,
+        "rules": {
+            "preset": "recommended",
+            "a11y": {
+                "noAutofocus": "off",
+                "useButtonType": "off",
+                "noStaticElementInteractions": "off"
+            },
+            "complexity": {
+                "noForEach": "off",
+                "noUselessFragments": "off"
+            },
+            "correctness": {
+                "noEmptyPattern": "off",
+                "noUnusedImports": "warn",
+                "noUnusedVariables": "warn",
+                "useExhaustiveDependencies": "warn"
+            },
+            "performance": {
+                "noImgElement": "off"
+            },
+            "style": {
+                "noNegationElse": "warn",
+                "noNonNullAssertion": "off",
+                "useFragmentSyntax": "off"
+            },
+            "suspicious": {
+                "noArrayIndexKey": "off",
+                "noEmptyBlockStatements": "error",
+                "noExplicitAny": "off",
+                "noUnknownAtRules": "off",
+                "useAwait": "warn",
+                "noDocumentCookie": "off"
+            }
+        },
+        "domains": {
+            "react": "recommended"
+        }
+    },
+    "vcs": {
+        "clientKind": "git",
+        "enabled": true,
+        "useIgnoreFile": true
+    }
+}
