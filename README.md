@@ -76,6 +76,7 @@ modules, run from the repository root with `python -m`:
 | `tools.repack.repack_2_lz4`      | `workspace/unpacked/1-bpak/`       | Brings the entries edited in layer 2 back into layer 1, recompressed                                     |
 | `tools.repack.repack_3_bpak`     | `workspace/repacked/`              | Rebuilds the paks from layer 1 and checks they're byte-identical to the game's                           |
 | `tools.install_paks`             | The game folder                    | Installs the rebuilt paks (backing up the originals in `workspace/backups/`), or restores the originals  |
+| `tools.patch_paks`               | The game folder                    | Appends the entries edited in layer 1 to the game's paks in seconds, or cuts them back to the originals  |
 | `tools.trace.collect_trace`      | `workspace/traces/`                | Copies the load trace the ASI wrote in the game folder (`[Debug] TraceLoads`), one file per game session |
 | `tools.trace.analyze_callbacks`  | The console                        | Reports what every loader callback of the traces loads, to name them (see `docs/RESEARCH.md`)            |
 
@@ -109,15 +110,25 @@ run it again with `--force` after collecting new ones:
 .venv/Scripts/python -m tools.unpack.unpack_3_identify --force
 ```
 
-Editing a pak goes the other way, edit the files in layer 2 then:
+Editing a pak goes the other way, edit the files in layer 2 then patch the game's pak: the edited entries and a new
+table of contents are appended after the original bytes, which stay untouched (a second of work, even for the 8 GiB
+`Resources.pak`):
 ```bash
 .venv/Scripts/python -m tools.repack.repack_2_lz4 --pak Engine
-.venv/Scripts/python -m tools.repack.repack_3_bpak --pak Engine --keep
-.venv/Scripts/python -m tools.install_paks --pak Engine
+.venv/Scripts/python -m tools.patch_paks --pak Engine
 
 # Back to the game's original pak (in the game folder and in the layers)
-.venv/Scripts/python -m tools.install_paks --pak Engine --restore
+.venv/Scripts/python -m tools.patch_paks --pak Engine --restore
 .venv/Scripts/python -m tools.unpack.unpack_1_bpak --pak Engine --force
+```
+
+Rebuilding a whole pak from layer 1 instead checks that layer 1 holds everything, and installs a pak with no
+leftover bytes, but takes 12 minutes for `Resources.pak`. The two ways don't stack, restore one before using the
+other:
+```bash
+.venv/Scripts/python -m tools.repack.repack_3_bpak --pak Engine --keep
+.venv/Scripts/python -m tools.install_paks --pak Engine
+.venv/Scripts/python -m tools.install_paks --pak Engine --restore
 ```
 
 Textures are edited in layer 4, then brought back into layer 2 first. The edited DDS files must stay DXT1 (BC1)
@@ -126,8 +137,7 @@ size of its albedo. The size and the mipmap count are free:
 ```bash
 .venv/Scripts/python -m tools.repack.repack_1_convert --pak Resources
 .venv/Scripts/python -m tools.repack.repack_2_lz4 --pak Resources
-.venv/Scripts/python -m tools.repack.repack_3_bpak --pak Resources --keep
-.venv/Scripts/python -m tools.install_paks --pak Resources
+.venv/Scripts/python -m tools.patch_paks --pak Resources
 ```
 
 The shared code sits next to the scripts: `tools/bpak.py` (the archive format), `tools/load_trace.py` (the load

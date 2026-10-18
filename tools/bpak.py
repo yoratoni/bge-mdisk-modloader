@@ -178,6 +178,21 @@ class Pak:
         return PakEntry(name, key, *fields), position + BPAK_ENTRY_FIELDS.size
 
 
+def serialize_header(header: PakHeader, entry_count: int, table_size: int) -> bytes:
+    """Serializes the header.
+
+    Args:
+        header: The header fields that aren't derived from the entries.
+        entry_count: The number of entries.
+        table_size: The size of the table of contents.
+
+    Returns:
+        The header bytes.
+    """
+    unknown_fields = (header.unknown_04, header.unknown_08, header.unknown_0c)
+    return BPAK_HEADER.pack(BPAK_MAGIC, *unknown_fields, entry_count, table_size)
+
+
 def serialize_table(entries: list[PakEntry]) -> bytes:
     """Serializes the table of contents.
 

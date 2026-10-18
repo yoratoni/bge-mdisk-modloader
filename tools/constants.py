@@ -40,6 +40,18 @@ LZ4_SUFFIX = ".lz4"
 # Appended to the file name of an entry to name the file holding its extra bytes
 EXTRA_SUFFIX = ".extra"
 
+# The entries the repack steps brought back into layer 1 since the pak was unpacked,
+# by file name, in its pak folder of layer 1
+EDITED_FILE_NAME = "edited.json"
+
+# endregion
+
+# region Patching
+
+# Appended to the backup path of a pak to name the record of its original
+# size and header, written by "tools.patch_paks" before it touches the pak
+PATCH_RECORD_SUFFIX = ".patch.json"
+
 # endregion
 
 # region Performance

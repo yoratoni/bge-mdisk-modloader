@@ -6,8 +6,14 @@ from pathlib import Path
 from typing import Any
 
 from tools.bpak import PakEntry, PakHeader
-from tools.constants import GAME_EXECUTABLE_NAME, INDEX_FILE_NAME, TOC_FILE_NAME
-from tools.paths import GAME_DIR, IDENTIFIED_LAYER_DIR, SETTINGS_EXAMPLE_PATH, SETTINGS_PATH
+from tools.constants import (
+    EDITED_FILE_NAME,
+    GAME_EXECUTABLE_NAME,
+    INDEX_FILE_NAME,
+    PATCH_RECORD_SUFFIX,
+    TOC_FILE_NAME,
+)
+from tools.paths import BACKUPS_DIR, GAME_DIR, IDENTIFIED_LAYER_DIR, SETTINGS_EXAMPLE_PATH, SETTINGS_PATH
 
 
 def add_game_argument(parser: argparse.ArgumentParser) -> None:
@@ -154,6 +160,47 @@ def read_toc(path: Path) -> tuple[PakHeader, list[PakEntry], list[str]]:
     ]
 
     return header, entries, [item["file"] for item in toc["entries"]]
+
+
+def read_edited_entries(layer_1_dir: Path) -> set[str]:
+    """Reads the entries the repack steps brought back into a pak folder of layer 1 since it was unpacked.
+
+    Args:
+        layer_1_dir: The pak folder of layer 1.
+
+    Returns:
+        The file names of the entries, empty if none was brought back.
+    """
+    edited_path = layer_1_dir / EDITED_FILE_NAME
+
+    if not edited_path.exists():
+        return set()
+
+    return set(json.loads(edited_path.read_text(encoding="utf-8")))
+
+
+def record_edited_entries(layer_1_dir: Path, file_names: set[str]) -> None:
+    """Adds entries to the ones the repack steps brought back into a pak folder of layer 1.
+
+    Args:
+        layer_1_dir: The pak folder of layer 1.
+        file_names: The file names of the entries brought back.
+    """
+    edited_entries = read_edited_entries(layer_1_dir) | file_names
+    (layer_1_dir / EDITED_FILE_NAME).write_text(json.dumps(sorted(edited_entries), indent=1), encoding="utf-8")
+
+
+def patch_record_path(relative_path: Path) -> Path:
+    """Returns the record "tools.patch_paks" keeps of the original state of a game file it patched.
+
+    Args:
+        relative_path: The game file, relative to the game folder.
+
+    Returns:
+        The record, next to where the backup of the file would be.
+    """
+    backup_path = BACKUPS_DIR / relative_path
+    return backup_path.with_name(backup_path.name + PATCH_RECORD_SUFFIX)
 
 
 def read_identified_types() -> dict[str, tuple[str, str]]:

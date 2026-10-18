@@ -9,7 +9,7 @@ import shutil
 from pathlib import Path
 
 from tools.paths import BACKUPS_DIR, GAME_COPY_DIR, GAME_ENTRIES
-from tools.utils import add_game_argument, check_game_dir, format_size
+from tools.utils import add_game_argument, check_game_dir, format_size, patch_record_path
 
 
 def needs_copy(source: Path, destination: Path) -> bool:
@@ -54,6 +54,12 @@ def main() -> None:
         for file in files:
             relative_path = file.relative_to(game_dir)
             destination = GAME_COPY_DIR / relative_path
+
+            # A pak patched by "tools.patch_paks" isn't the game's original anymore, the copy keeps the original
+            if patch_record_path(relative_path).exists():
+                skipped_count += 1
+                print(f"Kept {relative_path.as_posix()}, patched by tools.patch_paks", flush=True)
+                continue
 
             # A file replaced by "tools.install_paks" is copied from its backup, the game's original
             backup = BACKUPS_DIR / relative_path

@@ -1,9 +1,10 @@
-"""Brings the entries edited in layer 2 back into layer 1, recompressed, so the next step can rebuild the pak.
+"""Brings the entries edited in layer 2 back into layer 1, recompressed, so the next step can rebuild or patch the pak.
 
 An entry counts as edited when its file (or its ".extra" file) in layer 2 was modified after the layer was written
 and its content differs from layer 1. Edited entries are recompressed when they were compressed (LZ4 high
 compression, the game decompresses any valid LZ4 block), every other entry is left untouched in layer 1, so it stays
-byte-identical in the rebuilt pak. Both tables of contents are updated with the new sizes.
+byte-identical in the rebuilt pak. Both tables of contents are updated with the new sizes, and the entries brought
+back are added to "edited.json" in layer 1, for "tools.patch_paks".
 
 Run "tools.unpack.unpack_1_bpak --force" (then the next layers) on a pak to go back to the game's version.
 """
@@ -17,7 +18,7 @@ import lz4.block
 from tools.bpak import PakEntry
 from tools.constants import ENTRIES_DIR_NAME, EXTRA_SUFFIX, LZ4_COMPRESSION_MODE, TOC_FILE_NAME
 from tools.paths import BPAK_LAYER_DIR, LZ4_LAYER_DIR
-from tools.utils import format_size, read_toc, select_layer_paks, write_toc
+from tools.utils import format_size, read_toc, record_edited_entries, select_layer_paks, write_toc
 
 
 def read_layer_1_content(entry: PakEntry, path: Path) -> bytes:
@@ -131,6 +132,7 @@ def repack_pak(pak_name: str) -> list[str]:
     header, entries, layer_1_file_names = read_toc(layer_1_dir / TOC_FILE_NAME)
     layer_2_written_time = (layer_2_dir / TOC_FILE_NAME).stat().st_mtime
     changes: list[str] = []
+    edited_entries: set[str] = set()
 
     for entry, layer_1_file_name in zip(entries, layer_1_file_names):
         entry_change = repack_entry(
@@ -142,16 +144,19 @@ def repack_pak(pak_name: str) -> list[str]:
 
         if entry_change is not None:
             changes.append(entry_change)
+            edited_entries.add(entry.file_name)
 
         if entry.extra_size:
             extra_change = repack_extra(entry, layer_1_entries_dir, layer_2_entries_dir, layer_2_written_time)
 
             if extra_change is not None:
                 changes.append(extra_change)
+                edited_entries.add(entry.file_name)
 
     if changes:
         write_toc(layer_1_dir / TOC_FILE_NAME, header, entries, layer_1_file_names)
         write_toc(layer_2_dir / TOC_FILE_NAME, header, entries, [entry.file_name for entry in entries])
+        record_edited_entries(layer_1_dir, edited_entries)
 
     return changes
 

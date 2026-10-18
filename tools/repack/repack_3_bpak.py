@@ -10,10 +10,8 @@ import dataclasses
 import time
 from pathlib import Path
 
-from tools.bpak import PakEntry, PakHeader, align, serialize_table
+from tools.bpak import PakEntry, align, serialize_header, serialize_table
 from tools.constants import (
-    BPAK_HEADER,
-    BPAK_MAGIC,
     BPAK_PADDING_BYTE,
     ENTRIES_DIR_NAME,
     EXTRA_SUFFIX,
@@ -22,21 +20,6 @@ from tools.constants import (
 )
 from tools.paths import BPAK_LAYER_DIR, PAKS_DIR, REPACKED_DIR
 from tools.utils import read_toc, select_layer_paks
-
-
-def pack_header(header: PakHeader, entry_count: int, table_size: int) -> bytes:
-    """Serializes the header.
-
-    Args:
-        header: The header fields that aren't derived from the entries.
-        entry_count: The number of entries.
-        table_size: The size of the table of contents.
-
-    Returns:
-        The header bytes.
-    """
-    unknown_fields = (header.unknown_04, header.unknown_08, header.unknown_0c)
-    return BPAK_HEADER.pack(BPAK_MAGIC, *unknown_fields, entry_count, table_size)
 
 
 def repack_pak(input_dir: Path, output_path: Path) -> None:
@@ -54,7 +37,7 @@ def repack_pak(input_dir: Path, output_path: Path) -> None:
 
     with open(output_path, "wb", buffering=IO_BUFFER_SIZE) as output:
         # The table size is patched once the table is built
-        output.write(pack_header(header, len(entries), 0))
+        output.write(serialize_header(header, len(entries), 0))
         offset = 0
 
         for entry, file in zip(entries, files):
@@ -76,7 +59,7 @@ def repack_pak(input_dir: Path, output_path: Path) -> None:
         output.write(table)
 
         output.seek(0)
-        output.write(pack_header(header, len(entries), len(table)))
+        output.write(serialize_header(header, len(entries), len(table)))
 
 
 def find_first_difference(first_path: Path, second_path: Path) -> int | None:

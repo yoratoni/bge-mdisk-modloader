@@ -248,14 +248,15 @@ archive, with file names formatted by `"%s%s.%08x.%s"` (name, key, extension). W
 from a BigDir is one of the most valuable open questions.
 
 ## Modding results
-In-game tests of edited paks, rebuilt with the tools (the edited entries recompressed with LZ4 high compression, so
-the rebuilt paks differ in size from the originals):
-| Date       | Pak              | Change                                                                                                | Result                                                            |
-|------------|------------------|-------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------|
-| 2026-10-16 | `Text-fr.pak`    | `Nouvelle partie` → `MDISK ca marche` in entry `0x4900FDCA` (same length)                             | Shown in the main menu                                            |
-| 2026-10-16 | `Text-en_US.pak` | `New Game` → `MDISK!!!` in entry `0x4900FDC6` (same length)                                           | Rebuilt and installed with the French one, not checked in English |
-| 2026-10-16 | `Engine.pak`     | `FramePerf=0` → `1` in `BGE.ini`                                                                      | No FPS counter                                                    |
-| 2026-10-17 | `Resources.pak`  | `MDISK` painted in magenta DXT blocks on the French logo `0x09001331`, in its top-down DDS of layer 4 | Shown on the French main menu logo, the right way up              |
+In-game tests of edited paks, rebuilt or patched with the tools (the edited entries recompressed with LZ4 high
+compression, so the paks differ in size from the originals):
+| Date       | Pak              | Change                                                                                                   | Result                                                            |
+|------------|------------------|----------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------|
+| 2026-10-16 | `Text-fr.pak`    | `Nouvelle partie` → `MDISK ca marche` in entry `0x4900FDCA` (same length)                                | Shown in the main menu                                            |
+| 2026-10-16 | `Text-en_US.pak` | `New Game` → `MDISK!!!` in entry `0x4900FDC6` (same length)                                              | Rebuilt and installed with the French one, not checked in English |
+| 2026-10-16 | `Engine.pak`     | `FramePerf=0` → `1` in `BGE.ini`                                                                         | No FPS counter                                                    |
+| 2026-10-17 | `Resources.pak`  | `MDISK` painted in magenta DXT blocks on the French logo `0x09001331`, in its top-down DDS of layer 4    | Shown on the French main menu logo, the right way up              |
+| 2026-10-18 | `Resources.pak`  | The same logo, patched in place: the entry and a new table of contents appended after the original bytes | Shown the same, the game reads the table of contents from the end |
 
 **The paks aren't checked**: a rebuilt pak with a recompressed entry and a different size loads, editing the paks
 in place works. The FPS counter result is inconclusive, either it's compiled out of the retail exe or that `BGE.ini`
@@ -265,6 +266,16 @@ isn't the one that wins (`BGE.player.ini` is read after it), to check with a set
 in game, which confirms the cooked layout, the bottom-up orientation and the flip of the converted DDS files. The
 main menu logo has one texture per language: `0x09001331` (French), `0x0900133A` (English), `0x09001343` and
 `0x0900134C` (Chinese), `0x09001355` (Korean), `0x0900135E` (Japanese).
+
+**A pak can be patched without rewriting it**: `tools.patch_paks` appends the edited entries and a new table of
+contents after the original bytes, and only changes the table size in the header:
+```text
+[header][original data][original table of contents][edited entries][new table of contents]
+```
+The game finds the table of contents from the end of the file (file size minus the table size of the header), like
+the tools' reader, and ignores the original one left in the middle. Patching `Resources.pak` takes under a second,
+against 12 minutes for a full rebuild. Cutting the file back to its original size and header restores the original,
+byte-identical.
 
 ## Engine file layer
 Leads only, nothing confirmed at runtime yet:
@@ -388,8 +399,9 @@ The survey, every answer goes into this document:
    replacing or adding an asset means (keys referenced inside other assets).
 6. **Other channels**: Wwise IO, shaders, Bink movies, `Config/*.spe`, `BGE_Build.ini` switches, AI2C scripts vs a
    remaining AI interpreter.
-7. **Injection strategy**: patching the paks in place works (see [Modding results](#modding-results)), rank it
-   against a mod pak mounted by the ASI and loose files redirected by the ASI, which leave the game files untouched.
+7. **Injection strategy**: patching the paks in place works, in under a second by appending the edited entries (see
+   [Modding results](#modding-results)), rank it against a mod pak mounted by the ASI and loose files redirected by
+   the ASI, which leave the game files untouched.
 
 ## Method and tooling
 - Static analysis: Python with `pefile` (PE headers, sections) and `capstone` (disassembly), strings and their

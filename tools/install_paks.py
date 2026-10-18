@@ -9,7 +9,7 @@ import shutil
 from pathlib import Path
 
 from tools.paths import BACKUPS_DIR, PAKS_RELATIVE_DIR, REPACKED_DIR
-from tools.utils import add_game_argument, check_game_dir, format_size
+from tools.utils import add_game_argument, check_game_dir, format_size, patch_record_path
 
 
 def install_pak(pak_path: Path, game_dir: Path) -> None:
@@ -70,6 +70,11 @@ def main() -> None:
             )
 
         for pak_path in pak_paths:
+            # Installing over a patched pak would back it up as the game's original
+            if patch_record_path(PAKS_RELATIVE_DIR / pak_path.name).exists():
+                print(f"{pak_path.name}: left as is, patched by tools.patch_paks (restore it with --restore there)")
+                continue
+
             install_pak(pak_path, game_dir)
 
 
