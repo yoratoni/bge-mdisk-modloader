@@ -9,23 +9,19 @@
 > HxD for days and days, as you know, reverse engineering is a tedious process and having AI
 > assistance helps streamline some of the more repetitive tasks.
 
-## Status
-Early research phase, nothing usable for players yet. The goal is to make the 20th Anniversary Edition actually
-moddable, previous community tools stopped at extracting its files.
-
-The project is split in packages, each one with its own build, sources, dependencies and tests:
-| Package              | Output                              | Role                                                                                                                          |
-|----------------------|-------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|
-| `packages/asi`       | `MDiskModLoader.asi`                | The in-game toolbox (debugging and runtime injection), loaded by Ultimate ASI Loader, Windows only                            |
-| `packages/modloader` | MDisk Mod Loader (work in progress) | The desktop app installing the mods, Electron, Windows and Linux (Steam Deck), see its [README](packages/modloader/README.md) |
-| `packages/bpak`      | Library (planned)                   | The `.pak` archive format (read, write, compression), shared by the other packages, portable                                  |
-| `packages/packer`    | `MDiskPacker.exe` (planned)         | The repacker, unpacks and repacks the game's `Data/Paks/*.pak` archives to apply mods, portable                               |
-
-The name comes from the MDisks of the game, and from Mdisk, an extract/build tool for the original game's
+MDISK makes the 20th Anniversary Edition moddable, where the previous community tools stopped at extracting its
+files. The name comes from the MDisks of the game, and from Mdisk, an extract/build tool for the original game's
 `sally_clean.bf` that got lost years ago.
 
-The reverse engineering behind the project (archive format, engine structures, hook sites) is documented in
-[docs/RESEARCH.md](docs/RESEARCH.md).
+The reverse engineering behind it (archive format, engine structures, hook sites) is documented in
+[docs/RESEARCH.md](docs/RESEARCH.md), the related projects are listed in [docs/REPOSITORIES.md](docs/REPOSITORIES.md).
+
+## Packages
+Each package has its own build, sources, dependencies and tests:
+| Package              | Output               | Role                                                                                                                          |
+|----------------------|----------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| `packages/asi`       | `MDiskModLoader.asi` | The in-game toolbox (debugging and runtime injection), loaded by Ultimate ASI Loader, Windows only                            |
+| `packages/modloader` | MDisk Mod Loader     | The desktop app installing the mods, Electron, Windows and Linux (Steam Deck), see its [README](packages/modloader/README.md) |
 
 ## Building from source
 Requirements (the same as the widescreen fix):

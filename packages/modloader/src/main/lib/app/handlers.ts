@@ -1,4 +1,4 @@
-import CONSTANTS from "@main/lib/constants"
+import IPC_CONSTANTS from "@main/lib/constants/ipc"
 import { app, ipcMain } from "electron"
 
 /**
@@ -6,7 +6,7 @@ import { app, ipcMain } from "electron"
  * build time by electron-builder or read from `package.json` in dev.
  */
 export function registerAppHandlers() {
-    ipcMain.on(CONSTANTS.ipc.appGetVersion, event => {
+    ipcMain.on(IPC_CONSTANTS.appGetVersion, event => {
         event.returnValue = app.getVersion()
     })
 }

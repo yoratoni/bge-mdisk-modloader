@@ -1,0 +1,20 @@
+.scrollbar-main {
+    /* Thumb color */
+    --os-handle-bg: color-mix(
+        in srgb,
+        var(--muted-foreground),
+        transparent 30%
+    );
+    --os-handle-bg-hover: var(--primary);
+    --os-handle-bg-active: var(--primary);
+
+    /* Track color */
+    --os-track-bg-alpha: 0;
+    --os-track-bg-hover-alpha: 0;
+    --os-track-bg-active-alpha: 0;
+
+    /* Other options */
+    --os-size: 10px; /* Width of vertical scrollbar */
+    --os-padding-perpendicular: 0; /* Removes padding if you want it flush against the edge */
+    --os-corner-bg: transparent; /* Background color of the scrollbar corner */
+}

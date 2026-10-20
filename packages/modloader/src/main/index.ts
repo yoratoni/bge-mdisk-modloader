@@ -1,6 +1,8 @@
 import path from "node:path"
 import WINDOWS_CONFIG from "@main/config/windows"
 import { registerAppHandlers } from "@main/lib/app/handlers"
+import { registerGamesHandlers } from "@main/lib/games/handlers"
+import { registerModsHandlers } from "@main/lib/mods/handlers"
 import { attachWindowStateBroadcaster, registerWindowsControlHandlers } from "@main/lib/windows"
 import { app, BrowserWindow, shell } from "electron"
 
@@ -39,6 +41,10 @@ app.whenReady().then(() => {
     // Handlers, the app shell itself
     registerAppHandlers()
     registerWindowsControlHandlers()
+
+    // Handlers reaching the installs of the game and their mods
+    registerGamesHandlers()
+    registerModsHandlers()
 
     // Create the main window
     createMainWindow()

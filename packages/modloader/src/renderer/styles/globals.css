@@ -1,17 +1,112 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "overlayscrollbars/styles/overlayscrollbars.css";
 @import "./tailwind-theme.css";
+@import "./scrollbar.css";
 
 @layer base {
+    * {
+        @apply border-border outline-ring/50;
+    }
+
     html,
     body,
     #root {
+        color-scheme: dark;
         width: 100%;
         height: 100%;
+        margin: 0;
     }
 
     body {
-        background-color: var(--color-background);
-        color: var(--color-foreground);
-        font-family: var(--font-sans);
+        overscroll-behavior-y: contain;
+        @apply bg-background text-foreground font-sans;
     }
+
+    img {
+        user-select: none;
+        -webkit-user-drag: none;
+    }
+
+    h1 {
+        @apply text-3xl;
+    }
+
+    h2 {
+        @apply text-2xl;
+    }
+
+    h3 {
+        @apply text-xl;
+    }
+
+    h4 {
+        @apply text-lg;
+    }
+
+    h5 {
+        @apply text-base;
+    }
+
+    h6 {
+        @apply text-sm;
+    }
+
+    p {
+        @apply text-base;
+    }
+
+    button:not([disabled]),
+    [role="button"]:not([disabled]) {
+        cursor: pointer;
+    }
+}
+
+/*
+ * The colors of the game's own interface, measured (k-means) on its textures: the gallery frames (background,
+ * surfaces, text), the menu panels (primary), the logo (gold) and the menu art (cyan, muted text), only the colors,
+ * none of the art (see the README), the red isn't measured yet
+ */
+:root {
+    --background: #0d1620;
+    --foreground: #e3e5e6;
+    --card: #0f2227;
+    --card-foreground: #e3e5e6;
+    --popover: #0f2227;
+    --popover-foreground: #e3e5e6;
+    --primary: #47a77b;
+    --primary-foreground: #0d1620;
+    --secondary: #103d38;
+    --secondary-foreground: #e3e5e6;
+    --muted: #10282b;
+    --muted-foreground: #889397;
+    --accent: #103d38;
+    --accent-foreground: #e3e5e6;
+    --destructive: #d0493e;
+    --destructive-foreground: #ffffff;
+    --border: #1a3a3a;
+    --border-active: #206251;
+    --input: #1a3a3a;
+    --ring: #30f2f3;
+    --gold: #ebad2e;
+    --radius: 0.125rem;
+    --shadow-color: rgb(71 167 123 / 0.2);
+    --shadow-2xs: 1px 1px 2px 0px rgb(71 167 123 / 0.1);
+    --shadow-xs: 1px 1px 2px 0px rgb(71 167 123 / 0.1);
+    --shadow-sm:
+        1px 1px 2px 0px var(--shadow-color),
+        1px 1px 2px -1px var(--shadow-color);
+    --shadow:
+        1px 1px 2px 0px var(--shadow-color),
+        1px 1px 2px -1px var(--shadow-color);
+    --shadow-md:
+        1px 1px 2px 0px var(--shadow-color),
+        1px 2px 4px -1px var(--shadow-color);
+    --shadow-lg:
+        1px 1px 2px 0px var(--shadow-color),
+        1px 4px 6px -1px var(--shadow-color);
+    --shadow-xl:
+        1px 1px 2px 0px var(--shadow-color),
+        1px 8px 10px -1px var(--shadow-color);
+    --shadow-2xl: 1px 1px 2px 0px rgb(71 167 123 / 0.5);
 }

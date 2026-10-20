@@ -1,4 +1,4 @@
-import CONSTANTS from "@main/lib/constants"
+import IPC_CONSTANTS from "@main/lib/constants/ipc"
 import type { WindowState } from "@preload/index"
 import { BrowserWindow, ipcMain } from "electron"
 
@@ -28,7 +28,7 @@ export function attachWindowStateBroadcaster(window: BrowserWindow) {
      */
     const broadcast = () => {
         if (window.isDestroyed()) return
-        window.webContents.send(CONSTANTS.ipc.windowsStateChanged, getWindowState(window))
+        window.webContents.send(IPC_CONSTANTS.windowsStateChanged, getWindowState(window))
     }
 
     // Attach the broadcast function to all relevant window events
@@ -50,17 +50,17 @@ export function attachWindowStateBroadcaster(window: BrowserWindow) {
  * and to query its current state.
  */
 export function registerWindowsControlHandlers() {
-    ipcMain.handle(CONSTANTS.ipc.windowsGetState, event => {
+    ipcMain.handle(IPC_CONSTANTS.windowsGetState, event => {
         const window = BrowserWindow.fromWebContents(event.sender)
         if (!window) return null
         return getWindowState(window)
     })
 
-    ipcMain.on(CONSTANTS.ipc.windowsMinimize, event => {
+    ipcMain.on(IPC_CONSTANTS.windowsMinimize, event => {
         BrowserWindow.fromWebContents(event.sender)?.minimize()
     })
 
-    ipcMain.on(CONSTANTS.ipc.windowsMaximizeToggle, event => {
+    ipcMain.on(IPC_CONSTANTS.windowsMaximizeToggle, event => {
         const window = BrowserWindow.fromWebContents(event.sender)
         if (!window) return
 
@@ -68,7 +68,7 @@ export function registerWindowsControlHandlers() {
         else window.maximize()
     })
 
-    ipcMain.on(CONSTANTS.ipc.windowsClose, event => {
+    ipcMain.on(IPC_CONSTANTS.windowsClose, event => {
         BrowserWindow.fromWebContents(event.sender)?.close()
     })
 }

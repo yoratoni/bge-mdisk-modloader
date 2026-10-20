@@ -1,13 +1,141 @@
-@theme {
-    /*
-     * Placeholder tokens for the skeleton, the custom UI replaces them with its own.
-     */
-    --color-background: #111114;
-    --color-foreground: #e6e6ea;
-    --color-foreground-muted: #8b8b94;
-    --color-title-bar: #18181c;
-    --color-control-hover: #2a2a30;
-    --color-control-close-hover: #c42b1c;
+@theme inline {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-border-active: var(--border-active);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --color-gold: var(--gold);
 
-    --font-sans: system-ui, sans-serif;
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+
+    /* Slightly larger small texts than Tailwind's, easier to read (the spacing keeps its sizes) */
+    --text-xs: 0.8125rem; /* 13px instead of 12px */
+    --text-sm: 0.9375rem; /* 15px instead of 14px */
+
+    --animate-flash: flash 400ms ease-out;
+    --animate-shimmer: shimmer 1.8s ease-in-out infinite;
+
+    --shadow-2xs: var(--shadow-2xs);
+    --shadow-xs: var(--shadow-xs);
+    --shadow-sm: var(--shadow-sm);
+    --shadow: var(--shadow);
+    --shadow-md: var(--shadow-md);
+    --shadow-lg: var(--shadow-lg);
+    --shadow-xl: var(--shadow-xl);
+    --shadow-2xl: var(--shadow-2xl);
+
+    /* Primary scale, the greens of the game's menu panels (700 being "--primary", 900 and 950 its deep frames) */
+    --color-primary-100: #e6f6ee;
+    --color-primary-200: #c8ecda;
+    --color-primary-300: #a0dfc1;
+    --color-primary-400: #72d1a3;
+    --color-primary-500: #56b688;
+    --color-primary-600: #4dad81;
+    --color-primary-700: #47a77b;
+    --color-primary-800: #3a8f68;
+    --color-primary-900: #206251;
+    --color-primary-950: #103d38;
+
+    /* Success */
+    --color-success: hsl(124, 68%, 55%);
+    --color-success-100: hsl(124, 68%, 95%);
+    --color-success-200: hsl(124, 68%, 85%);
+    --color-success-300: hsl(124, 68%, 75%);
+    --color-success-400: hsl(124, 68%, 65%);
+    --color-success-500: hsl(124, 68%, 55%);
+    --color-success-600: hsl(124, 68%, 45%);
+    --color-success-700: hsl(124, 68%, 35%);
+    --color-success-800: hsl(124, 68%, 25%);
+    --color-success-900: hsl(124, 68%, 15%);
+    --color-success-950: hsl(124, 68%, 5%);
+
+    --color-success-foreground: hsl(0, 0%, 100%);
+
+    /* Warning */
+    --color-warning: oklch(79.5% 0.184 86.047);
+    --color-warning-100: oklch(98.7% 0.026 102.212);
+    --color-warning-200: oklch(97.3% 0.071 103.193);
+    --color-warning-300: oklch(94.5% 0.129 101.54);
+    --color-warning-400: oklch(90.5% 0.182 98.111);
+    --color-warning-500: oklch(79.5% 0.184 86.047);
+    --color-warning-600: oklch(68.1% 0.162 75.834);
+    --color-warning-700: oklch(55.4% 0.135 66.442);
+    --color-warning-800: oklch(47.6% 0.114 61.907);
+    --color-warning-900: oklch(42.1% 0.095 57.708);
+    --color-warning-950: oklch(28.6% 0.066 53.813);
+
+    --color-warning-foreground: hsl(0, 0%, 100%);
+
+    /* Danger */
+    --color-danger: hsl(0, 86%, 65%);
+    --color-danger-100: hsl(0, 86%, 95%);
+    --color-danger-200: hsl(0, 86%, 85%);
+    --color-danger-300: hsl(0, 86%, 75%);
+    --color-danger-400: hsl(0, 86%, 65%);
+    --color-danger-500: hsl(0, 86%, 55%);
+    --color-danger-600: hsl(0, 86%, 45%);
+    --color-danger-700: hsl(0, 86%, 35%);
+    --color-danger-800: hsl(0, 86%, 25%);
+    --color-danger-900: hsl(0, 86%, 15%);
+    --color-danger-950: hsl(0, 86%, 5%);
+
+    --color-danger-foreground: hsl(0, 0%, 100%);
+
+    /* Info, the cool grey of the game's menu art (the greens reading as success) */
+    --color-info: #889397;
+    --color-info-100: #f1f3f4;
+    --color-info-200: #dde2e3;
+    --color-info-300: #c3cacc;
+    --color-info-400: #a5afb2;
+    --color-info-500: #889397;
+    --color-info-600: #6d777b;
+    --color-info-700: #545c5f;
+    --color-info-800: #3c4244;
+    --color-info-900: #26292b;
+    --color-info-950: #151718;
+
+    --color-info-foreground: hsl(0, 0%, 100%);
+
+    /* The system fonts, Segoe UI on Windows */
+    --font-sans:
+        "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial,
+        sans-serif;
+}
+
+/* Flash animation for changing numbers */
+@keyframes flash {
+    0% {
+        color: var(--color-success);
+    }
+    100% {
+        color: inherit;
+    }
+}
+
+/* Light sweeping across the loading placeholders (skeletons) */
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
 }

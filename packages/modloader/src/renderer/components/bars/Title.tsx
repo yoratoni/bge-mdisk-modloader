@@ -1,5 +1,5 @@
 import { cn } from "@cybearl/cypack/frontend"
-import CONSTANTS from "@main/lib/constants"
+import WINDOWS_CONSTANTS from "@main/lib/constants/windows"
 import WindowButton from "@renderer/components/ui/WindowButton"
 import useWindowStates from "@renderer/hooks/useWindowStates"
 import type { CSSProperties } from "react"
@@ -14,12 +14,12 @@ export default function TitleBar({ title }: TitleBarProps) {
     return (
         <div
             className={cn(
-                "z-10 flex shrink-0 items-center justify-between gap-8 select-none bg-title-bar pl-3",
-                states?.isFocused ? "text-foreground" : "text-foreground-muted",
+                "z-10 flex shrink-0 items-center justify-between gap-8 select-none bg-card pl-3",
+                states?.isFocused ? "text-foreground" : "text-muted-foreground",
             )}
             style={
                 {
-                    height: CONSTANTS.titleBarHeight,
+                    height: WINDOWS_CONSTANTS.titleBarHeight,
                     WebkitAppRegion: "drag",
                 } as CSSProperties
             }

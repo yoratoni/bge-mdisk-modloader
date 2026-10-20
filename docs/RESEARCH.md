@@ -1,6 +1,6 @@
 # Research notes: BG&E 20th Anniversary Edition, modding
-Everything learned while reverse engineering `bge.exe` and its data for the mod loader: archive formats, engine file
-layer, injection points, and what is still open. Written so the work can be resumed from scratch.
+Reverse engineering notes on `bge.exe` and its data: the archive formats, the engine's file layer, the injection
+points and the open questions.
 
 All addresses are **RVAs** (offsets from the image base) for the build below, in Cheat Engine an RVA `0xAE6BD3` is
 written `"bge.exe"+AE6BD3`, in static tools it's `0x140AE6BD3` (default image base `0x140000000`). The display
@@ -29,15 +29,15 @@ findings (aspect ratio, cameras, FOV) live in the widescreen fix's own `docs/RES
 The mod loader logs the PE timestamp of the running `bge.exe` at startup, so every log identifies the build.
 
 ## Protection and injection
-**Denuvo Anti-Tamper**: the real game code is plain and unencrypted in `.didata` (RVA `0x1000`, ~21 MB), Denuvo's
-virtual machine lives in a separate ~330 MB writable + executable section (`.tls$`). Every code site found so far for
-the file layer is plain `.didata` code. The widescreen fix runs 7 mid hooks and a byte patch in `.didata` with no
-issue, the exe on disk must never be modified.
+The exe is protected by Denuvo Anti-Tamper, but the game code is plain and unencrypted in `.didata` (RVA `0x1000`,
+~21 MB), Denuvo's virtual machine lives in a separate ~330 MB writable and executable section (`.tls$`). Every code
+site found so far for the file layer is plain `.didata` code. The widescreen fix runs 7 mid hooks and a byte patch in
+`.didata` with no issue, the exe on disk must never be modified.
 
-There is **no anti-cheat** and the game is offline single-player, so modding carries no ban risk.
+There's no anti-cheat and the game is offline single-player, so modding carries no ban risk.
 
-**Injection**: the exe imports `dinput8.dll`, `winmm.dll` and `xinput1_4.dll`, so Ultimate ASI Loader works as
-`dinput8.dll` or `winmm.dll` in the game folder. Several ASIs coexist fine (the widescreen fix and the mod loader).
+The exe imports `dinput8.dll`, `winmm.dll` and `xinput1_4.dll`, so Ultimate ASI Loader works as `dinput8.dll` or
+`winmm.dll` in the game folder. Several ASIs coexist fine (the widescreen fix and the mod loader).
 
 ## Data layout
 ### Game folder
@@ -62,8 +62,8 @@ There is **no anti-cheat** and the game is offline single-player, so modding car
 `version=Steam`), it's likely store specific.
 
 ### BPAK format
-**Confirmed**: the paks are rebuilt byte-identically from their unpacked entries (`tools.repack.repack_3_bpak`), the
-layout is computed from scratch, so the rules below are the whole format. Every integer is little-endian.
+The paks rebuild byte-identically from their unpacked entries (`tools.repack.repack_3_bpak`), with the layout computed
+from scratch, so the rules below cover the whole format. Every integer is little-endian.
 
 The header is `0x18` bytes:
 | Offset | Type      | Value                                                                                  |
@@ -152,15 +152,14 @@ key) and about 1,100 entries of other shapes.
 The extra bytes are INI sections: `[Base]` on textures (2,666), `FogDensity=` on lights (3,307), `[Performance]`
 (107), `[Procedural]` (36) and `[Anniversary]` (8).
 
-**Reference lists**: Jade's lists store every reference as `[uint32 key][".ext"]`, the key followed by the extension
-of the file it points at (object lists, action kits, AI models, sound banks, text group lists, ...). 4,911 entries of
+Jade's reference lists store every reference as `[uint32 key][".ext"]`, the key followed by the extension of the
+file it points at (object lists, action kits, AI models, sound banks, text group lists, ...). 4,911 entries of
 `Resources.pak` hold such records, they give an extension to 64,977 keys (a single key gets two different ones).
 Layer 3 uses them, along with the types of the [loader callbacks](#loader-callbacks) of the collected load traces.
 
 ### Textures
-**Confirmed**: `tools.unpack.unpack_4_convert` converts all 3,700 textures of `Resources.pak` to DDS and TGA files,
-and `tools.repack.repack_1_convert --check` rebuilds every entry byte-identically from these files and their
-metadata.
+`tools.unpack.unpack_4_convert` converts all 3,700 textures of `Resources.pak` to DDS and TGA files, and
+`tools.repack.repack_1_convert --check` rebuilds every entry byte-identically from these files and their metadata.
 
 A texture entry is its content followed by Jade's texture header (Jaded's `TEX_tdst_File_Desc`), its last 32 bytes:
 | Offset | Type        | Value                                                                                    |
@@ -205,19 +204,17 @@ The set types, with the maps they store:
 | `5`      | Custom   | 1 to 4 maps, for a named shader (`SoftMesh`, `HologramMap`, `SimpleEmissive`, `IndoorWater`, ...) | 109      |
 | `6`      | Unnamed  | Albedo, for a named shader, two shader parameters                                                 | 5        |
 
-**Ray1Map swaps the last two maps**: it names the third map height/emissive and the fourth spec/gloss/occlusion,
-but the textures show the opposite:
+Ray1Map names the third map height/emissive and the fourth spec/gloss/occlusion, the textures show the opposite:
 - **The third map** packs three channels. It's flat `(0, 0, 255)` when unused, and on a tile it darkens only in
   blue in the grooves, so blue is occlusion.
 - **The fourth map** is the grayscale height map of the parallax sets, and the glow of the emissive sets (an eye).
 
-**Orientation**: every level is stored bottom-up, as in OpenGL. The converted DDS files are flipped to be top-down,
-block by block: the block rows are reversed, then the pixel rows inside every block. This flip is lossless and is
-its own inverse. Some levels have a height that isn't a multiple of 4: the small levels of the 290 textures whose
-size isn't a power of two (mostly 2560x1440, with 9 levels). Those levels end up shifted by up to 3 rows in the
-DDS, and are still exact once flipped back.
+Every level is stored bottom-up, as in OpenGL. The converted DDS files are flipped to be top-down, block by block:
+the block rows are reversed, then the pixel rows inside every block. The flip is lossless and its own inverse. The
+small levels of the 290 textures whose size isn't a power of two (mostly 2560x1440, with 9 levels) have heights that
+aren't multiples of 4, they end up shifted by up to 3 rows in the DDS and come back exact once flipped again.
 
-Two kinds of entries need special handling:
+Two kinds of entries convert differently:
 - **The 16 TGA textures** are plain uncompressed TGA files (24 or 32 bits, bottom-left origin) followed by the
   header, and convert as they are. One of them (`0x4901F0EF`) is a collage of portrait photos, likely the original
   team.
@@ -225,7 +222,7 @@ Two kinds of entries need special handling:
   UTF-16 path from Virtuos's build machine (`...LY_MS24_RC\P\Resources\CookingDir\WIN64\Textures\19000...`). The
   converter keeps it in the metadata.
 
-**Font descriptors** (`.fod`, Jaded's `STR_b_LoadFontDescriptor`) are laid out as follows:
+The font descriptors (`.fod`, Jaded's `STR_b_LoadFontDescriptor`) hold:
 - `"FONTDESC"`, then a `uint32` character count.
 - One record per glyph: a `uint32` character code, then 4 floats (`u0`, `v0`, `u1`, `v1`), the glyph's rectangle in
   the atlas.
@@ -245,7 +242,7 @@ BigDirIgnore=*.hlsl,ROOT\BigDir___locked__.w,ROOT\EngineDatas\04 Technical Bank\
 
 "BigDir" looks like the editor's unpacked form of the BIG file, a folder tree (`ROOT\EngineDatas\...`) instead of an
 archive, with file names formatted by `"%s%s.%08x.%s"` (name, key, extension). Whether the retail exe can still load
-from a BigDir is one of the most valuable open questions.
+from a BigDir is open.
 
 ## Modding results
 In-game tests of edited paks, rebuilt or patched with the tools (the edited entries recompressed with LZ4 high
@@ -257,18 +254,19 @@ compression, so the paks differ in size from the originals):
 | 2026-10-16 | `Engine.pak`     | `FramePerf=0` → `1` in `BGE.ini`                                                                         | No FPS counter                                                    |
 | 2026-10-17 | `Resources.pak`  | `MDISK` painted in magenta DXT blocks on the French logo `0x09001331`, in its top-down DDS of layer 4    | Shown on the French main menu logo, the right way up              |
 | 2026-10-18 | `Resources.pak`  | The same logo, patched in place: the entry and a new table of contents appended after the original bytes | Shown the same, the game reads the table of contents from the end |
+| 2026-10-20 | `Resources.pak`  | The same logo, installed as a mod by the mod loader app, the entry stored raw (packed size `0`)          | Shown the same, a compressed entry can be replaced by a raw one   |
 
-**The paks aren't checked**: a rebuilt pak with a recompressed entry and a different size loads, editing the paks
-in place works. The FPS counter result is inconclusive, either it's compiled out of the retail exe or that `BGE.ini`
-isn't the one that wins (`BGE.player.ini` is read after it), to check with a setting that's always visible.
+Nothing checks the paks: a rebuilt pak with a recompressed entry and a different size loads. The FPS counter result
+is inconclusive, either the counter is compiled out of the retail exe or this `BGE.ini` isn't the one that wins
+(`BGE.player.ini` is read after it), to check with a setting that's always visible.
 
-**Textures can be replaced**: a texture edited as a DDS file in layer 4 and brought back by the repack steps shows
-in game, which confirms the cooked layout, the bottom-up orientation and the flip of the converted DDS files. The
-main menu logo has one texture per language: `0x09001331` (French), `0x0900133A` (English), `0x09001343` and
-`0x0900134C` (Chinese), `0x09001355` (Korean), `0x0900135E` (Japanese).
+A texture edited as a DDS file in layer 4 and brought back by the repack steps shows in game, which confirms the
+cooked layout, the bottom-up orientation and the flip of the converted DDS files. The main menu logo has one texture
+per language: `0x09001331` (French), `0x0900133A` (English), `0x09001343` and `0x0900134C` (Chinese), `0x09001355`
+(Korean), `0x0900135E` (Japanese).
 
-**A pak can be patched without rewriting it**: `tools.patch_paks` appends the edited entries and a new table of
-contents after the original bytes, and only changes the table size in the header:
+A pak doesn't need to be rewritten to change entries, `tools.patch_paks` appends the edited entries and a new table
+of contents after the original bytes, and only changes the table size in the header:
 ```text
 [header][original data][original table of contents][edited entries][new table of contents]
 ```
@@ -278,7 +276,8 @@ against 12 minutes for a full rebuild. Cutting the file back to its original siz
 byte-identical.
 
 ## Engine file layer
-Leads only, nothing confirmed at runtime yet:
+The strings and immediates found statically around the file layer (the resolver below is the part confirmed at
+runtime):
 | RVA                    | Section   | What                                                                                                                           |
 |------------------------|-----------|--------------------------------------------------------------------------------------------------------------------------------|
 | `+98CE4`               | `.didata` | `'BPAK'` immediate                                                                                                             |
@@ -370,22 +369,14 @@ No texture goes through the resolver: Jade's materials reference textures by ind
 loaded separately, which matches the remaster's `texParamTable`.
 
 ## Prior art
-| Tool                                                                                  | Author           | Target                                                 | Scope and status                                                                                                                            |
-|---------------------------------------------------------------------------------------|------------------|--------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
-| Mdisk                                                                                 | yoratoni         | Original `.bf`                                         | TypeScript extract/build tool, deleted, never archived (Software Heritage only saw it deleted)                                              |
-| [BGEModTools](https://github.com/nillvy/BGEModTools)                                  | nillvy           | BPAK                                                   | C#, unpacks and identifies `png`, `gao`, `wem`, `fnt`, identical rebuild per its author, abandoned in May 2025                              |
-| [`Beyond_Good_and_Evil_PAK_BPAK_script.bms`](https://github.com/bartlomiejduda/Tools) | ikskoks          | BPAK                                                   | QuickBMS, unpacks, handles the hashed names of `Resources.pak`                                                                              |
-| [`bf.bt`](https://github.com/xesf/game-data-reverse-engineering)                      | xesf             | Original `.bf`                                         | 010 Editor template, not checked yet                                                                                                        |
-| [Ray1Map](https://github.com/BinarySerializer/Ray1Map)                                | BinarySerializer | Jade games, **including the 20th Anniversary Edition** | Unity viewer, reads BPAK (`BIG_PakFile.cs`), lists the unbinarized worlds (`Jade_BGE_Anniversary_Manager.cs`), no license so reference only |
-| [JadeStudio](https://github.com/4g3v/JadeStudio)                                      | 4g3v             | Original Jade games                                    | Not checked yet                                                                                                                             |
-| [Jaded](https://github.com/hogsy/jaded)                                               | hogsy            | Jade engine                                            | Community fork of the Jade engine source (2006 Rayman 4 prototype): `BIGfiles`, object, graphic object and texture loaders, no license      |
+The other projects around the game and the Jade engine, with their licenses, are listed in
+[REPOSITORIES.md](REPOSITORIES.md).
 
 Community references: [ResHax BPAK thread](https://reshax.com/topic/845-beyond-good-and-evil-20th-anniversary-edition-pak-bpak/),
 [Steam "Mod Tools" thread](https://steamcommunity.com/app/2556990/discussions/0/4407417241455999354/),
 [raydev.wiki Jade overview](https://raydev.wiki/jade:overview).
 
 ## Open questions
-The survey, every answer goes into this document:
 1. **BPAK**: solved (see [BPAK format](#bpak-format)), except the meaning of the three unknown header fields and of
    the constant unknown entry field.
 2. **Pak mounting**: how `Data/Paks/` files are enumerated (hard-coded list, directory scan, language suffix) and
@@ -398,14 +389,18 @@ The survey, every answer goes into this document:
    loader as reference), and check whether the Jade files keep the original game's structures, which decides what
    replacing or adding an asset means (keys referenced inside other assets).
 6. **Other channels**: Wwise IO, shaders, Bink movies, `Config/*.spe`, `BGE_Build.ini` switches, AI2C scripts vs a
-   remaining AI interpreter.
-7. **Injection strategy**: patching the paks in place works, in under a second by appending the edited entries (see
-   [Modding results](#modding-results)), rank it against a mod pak mounted by the ASI and loose files redirected by
-   the ASI, which leave the game files untouched.
+   remaining AI interpreter. On the 2003 PC version the AI is hybrid, per irisEng's decompilation
+   ([REPOSITORIES.md](REPOSITORIES.md)): a function runs as compiled C when the exe has it (most `.ofc` are 12-byte
+   stubs there), as interpreted nodes otherwise. The remaster ships whole functions instead (3,502 `.ofc`, 16.4 MiB)
+   with their variable names. The companion's `i_cheat_mode_on` (`0x35001FF7`) switches it to a joystick-driven
+   debug mode on the 2003 version, it's still to be tried on the remaster.
+7. **Injection strategy**: patching the paks in place works, in under a second (see
+   [Modding results](#modding-results)). A mod pak mounted by the ASI, or loose files redirected by the ASI, would
+   leave the game files untouched.
 
 ## Method and tooling
 - Static analysis: Python with `pefile` (PE headers, sections) and `capstone` (disassembly), strings and their
   RIP-relative references as entry points, function boundaries from the `.pdata` exception table.
 - Runtime confirmation: Cheat Engine and temporary logging hooks in the mod loader.
 - Archives: the Python tools in `tools/` unpack the paks layer by layer (see the README), validated by byte-identical
-  rebuilds, `MDiskPacker` will do the same in C++.
+  rebuilds, the mod loader app (`packages/modloader`) patches them the same way.
