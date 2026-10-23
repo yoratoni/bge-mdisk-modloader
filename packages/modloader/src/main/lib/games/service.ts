@@ -1,6 +1,6 @@
 import path from "node:path"
 import GAMES_CONSTANTS from "@main/lib/constants/games"
-import { identifyEdition } from "@main/lib/games/identify"
+import { identifyEdition, identifyOriginalBuild } from "@main/lib/games/identify"
 import { findInstallerGames } from "@main/lib/games/installers"
 import { findSteamGames } from "@main/lib/games/steam"
 import { configStore } from "@main/lib/stores/config"
@@ -56,6 +56,7 @@ export async function detectGames(): Promise<GamesState> {
         games.push({
             path: path.resolve(folder),
             edition,
+            build: edition === "original" ? await identifyOriginalBuild(folder) : null,
             source,
         })
     }

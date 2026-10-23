@@ -1,7 +1,10 @@
 import { readdir } from "node:fs/promises"
 import path from "node:path"
+import { identifyBigBuild } from "@main/lib/big/build"
+import BIG_CONSTANTS from "@main/lib/constants/big"
 import GAMES_CONSTANTS from "@main/lib/constants/games"
-import type { GameEdition } from "@/main/types/games"
+import { findFileWithoutCase } from "@main/lib/utils/fs"
+import type { GameEdition, OriginalBuild } from "@/main/types/games"
 
 /**
  * Lists the entries of a folder by lowercase name, telling the folders from the files.
@@ -39,4 +42,15 @@ export async function identifyEdition(dir: string): Promise<GameEdition | null> 
 
     const paksDir = (await listEntries(path.join(dir, dataDir.name))).get(GAMES_CONSTANTS.markers.anniversaryPaksDir)
     return paksDir?.isDirectory ? "anniversary" : null
+}
+
+/**
+ * Tells the build of the original edition installed in a folder, from its BIG file.
+ * @param dir The folder, an original edition.
+ * @returns The build, `null` when it's not a known one.
+ */
+export async function identifyOriginalBuild(dir: string): Promise<OriginalBuild | null> {
+    const bigPath = await findFileWithoutCase(dir, BIG_CONSTANTS.fileName)
+
+    return bigPath ? identifyBigBuild(bigPath) : null
 }

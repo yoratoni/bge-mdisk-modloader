@@ -4,6 +4,12 @@
 export type GameEdition = "anniversary" | "original"
 
 /**
+ * The known builds of the original edition, their BIG files holding different versions of the same files: the 2019
+ * rebuild sold on Steam, and the 2003 one sold on GOG.
+ */
+export type OriginalBuild = "steam" | "gog"
+
+/**
  * Where an install was found.
  */
 export type GameSource = "steam" | "gog" | "ubisoft" | "retail" | "manual"
@@ -21,6 +27,12 @@ export type Game = {
      * The edition, told from the files of the folder.
      */
     edition: GameEdition
+
+    /**
+     * The build of an original edition, told from its BIG file, `null` for the 20th Anniversary Edition or a build the
+     * mod loader doesn't know.
+     */
+    build: OriginalBuild | null
 
     /**
      * Where the install was found.

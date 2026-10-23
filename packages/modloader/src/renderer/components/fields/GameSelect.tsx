@@ -1,6 +1,6 @@
 import { Button } from "@renderer/components/ui/Button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@renderer/components/ui/Select"
-import GAMES_UI_CONSTANTS from "@renderer/lib/constants/games"
+import { describeGameSource, describeGameTarget } from "@renderer/lib/utils/mods"
 import { FolderPlusIcon, RotateCwIcon } from "lucide-react"
 import type { Game } from "@/main/types/games"
 
@@ -24,8 +24,8 @@ export default function GameSelect({ games, selectedGame, isDetecting, onSelect,
                 <SelectContent>
                     {games.map(game => (
                         <SelectItem key={game.path} value={game.path}>
-                            {GAMES_UI_CONSTANTS.editionNames[game.edition]}
-                            <span className="text-muted-foreground">{GAMES_UI_CONSTANTS.sourceNames[game.source]}</span>
+                            {describeGameTarget(game)}
+                            <span className="text-muted-foreground">{describeGameSource(game)}</span>
                         </SelectItem>
                     ))}
                 </SelectContent>

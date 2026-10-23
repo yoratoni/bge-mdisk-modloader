@@ -1,5 +1,6 @@
 import { cn } from "@cybearl/cypack/frontend"
 import { DynamicIcon, type IconName } from "lucide-react/dynamic"
+import type { ReactNode } from "react"
 import { toast as sonnerToast } from "sonner"
 
 type ToastProps = {
@@ -7,7 +8,7 @@ type ToastProps = {
     backgroundColor: string
     icon: IconName
     title: string
-    description?: string
+    description?: ReactNode
 }
 
 /**
@@ -35,7 +36,7 @@ function Toast({ icon, backgroundColor, title, description }: ToastProps) {
  * Toast notification methods.
  */
 const toast = {
-    success: (title: string, description?: string) => {
+    success: (title: string, description?: ReactNode) => {
         sonnerToast.custom(id => (
             <Toast
                 id={id}
@@ -46,7 +47,7 @@ const toast = {
             />
         ))
     },
-    warning: (title: string, description?: string) => {
+    warning: (title: string, description?: ReactNode) => {
         sonnerToast.custom(id => (
             <Toast
                 id={id}
@@ -57,12 +58,12 @@ const toast = {
             />
         ))
     },
-    error: (title: string, description?: string) => {
+    error: (title: string, description?: ReactNode) => {
         sonnerToast.custom(id => (
             <Toast id={id} icon="circle-x" backgroundColor="bg-danger/15" title={title} description={description} />
         ))
     },
-    info: (title: string, description?: string) => {
+    info: (title: string, description?: ReactNode) => {
         sonnerToast.custom(id => (
             <Toast id={id} icon="info" backgroundColor="bg-info/20" title={title} description={description} />
         ))

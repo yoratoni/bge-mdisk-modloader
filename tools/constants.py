@@ -91,6 +91,50 @@ BPAK_ENTRY_FIELDS = struct.Struct("<IIIIQ")
 
 # endregion
 
+# region BIG format
+
+# The BIG file of the original edition, at the root of the game folder
+BIG_FILE_NAME = "sally_clean.bf"
+
+BIG_MAGIC = b"BIG\0"
+
+# The version of the BIG file of the PC releases (Steam, GOG, discs), the only one read
+BIG_VERSION = 0x22
+
+# Magic, version, file count, folder count, capacity (slots of the file table, at 0x20), table count (at 0x24),
+# position of the file table (at 0x34, in the descriptor of the first table that ends the header)
+BIG_HEADER = struct.Struct("<4sIII16xII12xI")
+
+# A slot of the file table: the position of the file, its key
+BIG_SLOT = struct.Struct("<II")
+
+# A file record, after the file table: size (as its size field), previous and next file of its folder, folder,
+# timestamp, name
+BIG_FILE_RECORD = struct.Struct("<IiiiI64s")
+
+# A folder record, after the file records: first file, first subfolder, previous and next folder, parent, name
+BIG_FOLDER_RECORD = struct.Struct("<iiiii64s")
+
+# The size field starting every file, which counts the zero padding ending it on a sector boundary
+BIG_SIZE_FIELD = struct.Struct("<I")
+
+# The header of an LZO block of a compressed file: unpacked size, packed size (equal when stored raw), an empty block
+# ending the chain
+BIG_BLOCK_HEADER = struct.Struct("<II")
+
+# The files of the keys whose top 4 bits are 0xF are LZO compressed, except under the raw prefixes (top 8 and 12 bits)
+BIG_COMPRESSED_KEY_NIBBLE = 0xF
+BIG_RAW_KEY_PREFIX_8 = 0xF4
+BIG_RAW_KEY_PREFIX_12 = 0xFF4
+
+# The index written in the output folder of "tools.unpack.unpack_big", last
+BIG_INDEX_FILE_NAME = "index.json"
+
+# The folder holding the unpacked files in the output folder of "tools.unpack.unpack_big", named after their key
+BIG_FILES_DIR_NAME = "files"
+
+# endregion
+
 # region Identification
 
 # The bytes read from the start of every entry to identify it

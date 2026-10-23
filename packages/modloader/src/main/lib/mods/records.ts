@@ -3,10 +3,9 @@ import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
 import MODS_CONSTANTS from "@main/lib/constants/mods"
 import { getStoreDir } from "@main/lib/utils/stores"
-import type { PatchRecord } from "@/main/types/bpak"
 
 /**
- * Returns the folder holding the records of the paks of one install, named after a hash of its folder.
+ * Returns the folder holding the records of the archives of one install, named after a hash of its folder.
  * @param gamePath The install folder.
  * @returns The folder.
  */
@@ -21,55 +20,55 @@ function getRecordsDir(gamePath: string): string {
 }
 
 /**
- * Returns the record of one pak of an install.
+ * Returns the record of one archive of an install.
  * @param gamePath The install folder.
- * @param pakName The pak name, without extension.
+ * @param archiveName The file name of the archive: a pak (e.g. "Resources.pak"), or the BIG file.
  * @returns The record file.
  */
-function getRecordPath(gamePath: string, pakName: string): string {
-    return path.join(getRecordsDir(gamePath), `${pakName}${MODS_CONSTANTS.recordExtension}`)
+function getRecordPath(gamePath: string, archiveName: string): string {
+    return path.join(getRecordsDir(gamePath), `${archiveName}${MODS_CONSTANTS.recordExtension}`)
 }
 
 /**
- * Reads the record of a pak the mod loader patched.
+ * Reads the record of an archive the mod loader patched.
  * @param gamePath The install folder.
- * @param pakName The pak name, without extension.
- * @returns The record, `null` when the pak isn't patched.
+ * @param archiveName The file name of the archive: a pak (e.g. "Resources.pak"), or the BIG file.
+ * @returns The record, `null` when the archive isn't patched.
  */
-export async function readRecord(gamePath: string, pakName: string): Promise<PatchRecord | null> {
+export async function readRecord<T>(gamePath: string, archiveName: string): Promise<T | null> {
     try {
-        return JSON.parse(await readFile(getRecordPath(gamePath, pakName), "utf-8")) as PatchRecord
+        return JSON.parse(await readFile(getRecordPath(gamePath, archiveName), "utf-8")) as T
     } catch {
         return null
     }
 }
 
 /**
- * Writes the record of a pak, before the pak is touched, so an interrupted patch can still be restored.
+ * Writes the record of an archive, before the archive is touched, so an interrupted patch can still be restored.
  * @param gamePath The install folder.
- * @param pakName The pak name, without extension.
- * @param record The original state of the pak.
+ * @param archiveName The file name of the archive: a pak (e.g. "Resources.pak"), or the BIG file.
+ * @param record The original state of the archive.
  */
-export async function writeRecord(gamePath: string, pakName: string, record: PatchRecord) {
+export async function writeRecord(gamePath: string, archiveName: string, record: object) {
     await mkdir(getRecordsDir(gamePath), { recursive: true })
-    await writeFile(getRecordPath(gamePath, pakName), JSON.stringify(record, null, 4), "utf-8")
+    await writeFile(getRecordPath(gamePath, archiveName), JSON.stringify(record, null, 4), "utf-8")
 }
 
 /**
- * Deletes the record of a pak, once it's back to its original.
+ * Deletes the record of an archive, once it's back to its original.
  * @param gamePath The install folder.
- * @param pakName The pak name, without extension.
+ * @param archiveName The file name of the archive: a pak (e.g. "Resources.pak"), or the BIG file.
  */
-export async function deleteRecord(gamePath: string, pakName: string) {
-    await rm(getRecordPath(gamePath, pakName), { force: true })
+export async function deleteRecord(gamePath: string, archiveName: string) {
+    await rm(getRecordPath(gamePath, archiveName), { force: true })
 }
 
 /**
- * Lists the paks of an install the mod loader patched.
+ * Lists the archives of an install the mod loader patched.
  * @param gamePath The install folder.
- * @returns The pak names, without extension.
+ * @returns The file names of the archives: the paks, and the BIG file.
  */
-export async function listRecordedPaks(gamePath: string): Promise<string[]> {
+export async function listRecordedArchives(gamePath: string): Promise<string[]> {
     try {
         const files = await readdir(getRecordsDir(gamePath))
         return files

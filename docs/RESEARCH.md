@@ -1,6 +1,6 @@
 # Research notes: BG&E 20th Anniversary Edition, modding
-Reverse engineering notes on `bge.exe` and its data: the archive formats, the engine's file layer, the injection
-points and the open questions.
+Reverse engineering notes on `bge.exe` and its data: the archive formats (with the original edition's BIG file), the
+engine's file layer, the injection points and the open questions.
 
 All addresses are **RVAs** (offsets from the image base) for the build below, in Cheat Engine an RVA `0xAE6BD3` is
 written `"bge.exe"+AE6BD3`, in static tools it's `0x140AE6BD3` (default image base `0x140000000`). The display
@@ -244,17 +244,82 @@ BigDirIgnore=*.hlsl,ROOT\BigDir___locked__.w,ROOT\EngineDatas\04 Technical Bank\
 archive, with file names formatted by `"%s%s.%08x.%s"` (name, key, extension). Whether the retail exe can still load
 from a BigDir is open.
 
+### Original edition BIG file
+The original edition keeps every file in `sally_clean.bf`, a Jade BIG file of version `0x22`, read by `tools/big.py`
+and patched by the mod loader app. The field names come from Jaded's `BIGdefs.h`. Two builds were checked:
+| Build | Size                | Files  | Folders | File timestamps |
+|-------|---------------------|--------|---------|-----------------|
+| Steam | 2,670,911,488 bytes | 10,005 | 11,023  | 2019-09-26      |
+| GOG   | 2,171,727,872 bytes | 8,924  | 335     | 2003-11-07      |
+
+The header is `0x2C` bytes, then the descriptor of the first file table (`BIG_tdst_FatDes`) runs to `0x44`, every
+integer little-endian:
+| Offset | Field              | Value                                                                    |
+|--------|--------------------|--------------------------------------------------------------------------|
+| `0x00` | `ac_Def`           | `"BIG\0"`                                                                |
+| `0x04` | `ul_Version`       | `0x22`                                                                   |
+| `0x08` | `ul_MaxFile`       | File count                                                               |
+| `0x0C` | `ul_MaxDir`        | Folder count                                                             |
+| `0x10` | `ul_MaxKey`        | `0`                                                                      |
+| `0x14` | `ul_Root`          | `0`, the index of the `ROOT` folder                                      |
+| `0x18` | `ul_FirstFreeFile` | `-1`                                                                     |
+| `0x1C` | `ul_FirstFreeDir`  | `-1`                                                                     |
+| `0x20` | `ul_SizeOfFat`     | 11,166 in both builds, the slots of the file table (more than the files) |
+| `0x24` | `ul_NumFat`        | `1`, the number of file tables                                           |
+| `0x28` | `ul_UniverseKey`   | `0x71003FF9`, the `UniverseKey` of `BigDir.jdproj`                       |
+| `0x2C` | `ul_MaxFile`       | File count, in the file table                                            |
+| `0x30` | `ul_MaxDir`        | Folder count, in the file table                                          |
+| `0x34` | `ul_PosFat`        | `0x44`, the position of the file table                                   |
+| `0x38` | `ul_NextPosFat`    | `-1`, no other file table                                                |
+| `0x3C` | `ul_FirstIndex`    | `0`                                                                      |
+| `0x40` | `ul_LastIndex`     | 11,165, the last slot                                                    |
+
+From `0x44`, three tables of `ul_SizeOfFat` rows each:
+1. The file table: the position of every file, then its key, 8 bytes per slot.
+2. The file records, 84 bytes: size, previous and next file of its folder, folder, timestamp, `char[64]` name.
+3. The folder records, 84 bytes: first file, first subfolder, previous and next folder, parent, `char[64]` name.
+
+The data starts at `0x1E0000`. Every file is a `uint32` size, then its data, zero padded so that the file ends on a
+2048-byte boundary, its size field included. The size counts the padding and matches the file record. The files
+follow each other with no gap, and the BIG file ends at the last one.
+
+The key alone decides compression: a file is a chain of LZO blocks when its key's top 4 bits are `0xF`, except under
+the prefixes `0xF4` and `0xFF4`. A block is `[uint32 unpacked size][uint32 packed size][data]`, at most 512,000
+unpacked bytes, stored raw when both sizes are equal (12 blocks on Steam, 6 on GOG), and an empty block ends the
+chain. 2,341 files are compressed on Steam (6.8 GiB unpacked), 1,261 on GOG.
+
+The folders give every file its path in the editor's tree, e.g.
+`ROOT/EngineDatas/04 Technical Bank/AI Models/World&co/univers/univers.omd`. Every Steam folder leads to `ROOT`.
+The GOG build only keeps 335 folder records, but its file records still point at folders up to 11,022 (the same
+folders as Steam), so only the file names are left there.
+
+The two builds share 8,920 keys, and 8,193 of these files are identical (textures, sounds, most of the rest). The
+727 others are binarized worlds and their text (`0xFD......` and `0xFF......`). Steam has 1,085 keys GOG doesn't,
+GOG has 4 Steam doesn't. The header tells the builds apart, from its file and folder counts, which a patch never
+changes.
+
+The binarized worlds `ROOT/Bin/fd??????.bin` carry their own copy of the menu text, one file per world and language,
+the language in the key: `0xFD1.....` French, `0xFD2.....` English, `0xFD3.....` German, `0xFD5.....` Italian, 91
+worlds each. Both builds have the same keys with a different content in every one, so a file taken from one build
+isn't meant for the other.
+
+The mod loader app patches the BIG file the way it patches the paks. It appends the replaced files after the
+original bytes, from the next sector, and points their slots and file records at them. The original tables (about 1 MiB)
+go in its record. A file of a compressed key is stored as raw LZO blocks. On a copy of the Steam build, 91 files
+were appended in 22 ms, and cutting the file back with its original tables restored it byte-identically.
+
 ## Modding results
-In-game tests of edited paks, rebuilt or patched with the tools (the edited entries recompressed with LZ4 high
-compression, so the paks differ in size from the originals):
-| Date       | Pak              | Change                                                                                                   | Result                                                            |
-|------------|------------------|----------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------|
-| 2026-10-16 | `Text-fr.pak`    | `Nouvelle partie` → `MDISK ca marche` in entry `0x4900FDCA` (same length)                                | Shown in the main menu                                            |
-| 2026-10-16 | `Text-en_US.pak` | `New Game` → `MDISK!!!` in entry `0x4900FDC6` (same length)                                              | Rebuilt and installed with the French one, not checked in English |
-| 2026-10-16 | `Engine.pak`     | `FramePerf=0` → `1` in `BGE.ini`                                                                         | No FPS counter                                                    |
-| 2026-10-17 | `Resources.pak`  | `MDISK` painted in magenta DXT blocks on the French logo `0x09001331`, in its top-down DDS of layer 4    | Shown on the French main menu logo, the right way up              |
-| 2026-10-18 | `Resources.pak`  | The same logo, patched in place: the entry and a new table of contents appended after the original bytes | Shown the same, the game reads the table of contents from the end |
-| 2026-10-20 | `Resources.pak`  | The same logo, installed as a mod by the mod loader app, the entry stored raw (packed size `0`)          | Shown the same, a compressed entry can be replaced by a raw one   |
+In-game tests of edited paks (and of the original edition's BIG file), rebuilt or patched with the tools (the edited
+entries recompressed with LZ4 high compression, so the paks differ in size from the originals):
+| Date       | Archive          | Change                                                                                                                                                                            | Result                                                                                       |
+|------------|------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|
+| 2026-10-16 | `Text-fr.pak`    | `Nouvelle partie` → `MDISK ca marche` in entry `0x4900FDCA` (same length)                                                                                                         | Shown in the main menu                                                                       |
+| 2026-10-16 | `Text-en_US.pak` | `New Game` → `MDISK!!!` in entry `0x4900FDC6` (same length)                                                                                                                       | Rebuilt and installed with the French one, not checked in English                            |
+| 2026-10-16 | `Engine.pak`     | `FramePerf=0` → `1` in `BGE.ini`                                                                                                                                                  | No FPS counter                                                                               |
+| 2026-10-17 | `Resources.pak`  | `MDISK` painted in magenta DXT blocks on the French logo `0x09001331`, in its top-down DDS of layer 4                                                                             | Shown on the French main menu logo, the right way up                                         |
+| 2026-10-18 | `Resources.pak`  | The same logo, patched in place: the entry and a new table of contents appended after the original bytes                                                                          | Shown the same, the game reads the table of contents from the end                            |
+| 2026-10-20 | `Resources.pak`  | The same logo, installed as a mod by the mod loader app, the entry stored raw (packed size `0`)                                                                                   | Shown the same, a compressed entry can be replaced by a raw one                              |
+| 2026-10-23 | `sally_clean.bf` | `Nouvelle partie` → `MDISK ca marche` in the 91 French text banks (`0xFD1.....`), appended by the mod loader app as raw LZO blocks, Steam and GOG builds, each from its own banks | Shown in the menu on both builds, the 2003 engine reads files appended past the original end |
 
 Nothing checks the paks: a rebuilt pak with a recompressed entry and a different size loads. The FPS counter result
 is inconclusive, either the counter is compiled out of the retail exe or this `BGE.ini` isn't the one that wins
@@ -378,7 +443,8 @@ Community references: [ResHax BPAK thread](https://reshax.com/topic/845-beyond-g
 
 ## Open questions
 1. **BPAK**: solved (see [BPAK format](#bpak-format)), except the meaning of the three unknown header fields and of
-   the constant unknown entry field.
+   the constant unknown entry field. The original edition's BIG file is solved too (see
+   [Original edition BIG file](#original-edition-big-file)), patching it in place works in game on both builds.
 2. **Pak mounting**: how `Data/Paks/` files are enumerated (hard-coded list, directory scan, language suffix) and
    whether an extra pak can be mounted with priority (Ray1Map names the header field at `0x08` "priority"). Nothing
    checks the paks (see [Modding results](#modding-results)).

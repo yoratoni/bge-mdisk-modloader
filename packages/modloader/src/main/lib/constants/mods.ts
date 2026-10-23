@@ -1,5 +1,3 @@
-import type { GameEdition } from "@/main/types/games"
-
 /**
  * All constants related to the mods: their format, where they're kept and how they're applied.
  */
@@ -10,12 +8,12 @@ const MODS_CONSTANTS = {
     modsDirName: "mods",
 
     /**
-     * The folder holding the records of the patched paks, in the app's data folder, one folder per install.
+     * The folder holding the records of the patched archives, in the app's data folder, one folder per install.
      */
     patchesDirName: "patches",
 
     /**
-     * The extension of the records of the patched paks, one per pak.
+     * The extension of the records of the patched archives, one per archive.
      */
     recordExtension: ".json",
 
@@ -35,15 +33,16 @@ const MODS_CONSTANTS = {
     manifestFileName: "mod.json",
 
     /**
-     * The editions a mod can be made for, its "edition" field.
-     */
-    editions: ["anniversary", "original"] as GameEdition[],
-
-    /**
-     * The folder of a mod holding its entries, one folder per pak (e.g. "paks/Resources/09001331"), each file being the
-     * new content of an entry (as the unpacked layer 2 names and holds it).
+     * The folder of a mod holding its part for the 20th Anniversary Edition, one folder per pak (e.g.
+     * "paks/Resources/09001331"), each file being the new content of an entry (as the unpacked layer 2 holds it).
      */
     paksDirName: "paks",
+
+    /**
+     * The folder of a mod holding its part for the original edition, files named after their keys: in the folder for
+     * every build (e.g. "bf/61000001"), in a folder named after a build for that one (e.g. "bf/gog/fd10631a").
+     */
+    bigDirName: "bf",
 
     /**
      * Appended to the file name of an entry to name the file holding its new extra bytes.
@@ -71,7 +70,7 @@ const MODS_CONSTANTS = {
     addDialogTitle: "Pick the folder of a mod",
 
     /**
-     * The error codes of a pak opened by another process, the game most likely.
+     * The error codes of an archive opened by another process, the game most likely.
      */
     busyErrorCodes: ["EBUSY", "EPERM", "EACCES"],
 
@@ -80,9 +79,9 @@ const MODS_CONSTANTS = {
      */
     messages: {
         noGame: "No install of the game is picked.",
-        unsupportedEdition: "Mods can only be applied to the 20th Anniversary Edition for now.",
         missingPak: "The game has no pak named",
-        gameRunning: "A pak of the game is in use, close the game before applying the mods.",
+        missingBig: "The game has no BIG file named",
+        gameRunning: "A file of the game is in use, close the game before applying the mods.",
     },
 } as const
 

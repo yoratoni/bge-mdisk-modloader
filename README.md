@@ -2,7 +2,7 @@
   <br />
   <a href="https://yoratoni.com" target="_blank"><img width="100px" src="https://yoratoni.com/favicon.ico" /></a>
   <h2 align="center">@yoratoni/bge-mdisk-modloader</h2>
-  <p align="center">A mod loader for Beyond Good & Evil 20th anniversary edition.</p>
+  <p align="center">A mod loader for Beyond Good & Evil, the 20th Anniversary Edition and the original.</p>
 </p>
 
 > Note: I'm not a fan but yes, i'm using AI a bit for lookups and docs, I had my share of looking at
@@ -70,6 +70,7 @@ modules, run from the repository root with `python -m`:
 | `tools.unpack.unpack_2_lz4`      | `workspace/unpacked/2-lz4/`        | Decompresses the entries of layer 1                                                                      |
 | `tools.unpack.unpack_3_identify` | `workspace/unpacked/3-identified/` | Sorts the entries of layer 2 into one folder per type (`unknown/` when not identified yet)               |
 | `tools.unpack.unpack_4_convert`  | `workspace/unpacked/4-converted/`  | Converts the textures of layer 3 to DDS (one per map, top-down) and TGA files, with their metadata       |
+| `tools.unpack.unpack_big`        | `workspace/unpacked/big/<name>/`   | Unpacks the original edition's `sally_clean.bf`, decompressed, with an index of names and folders        |
 | `tools.repack.repack_1_convert`  | `workspace/unpacked/2-lz4/`        | Brings the textures edited in layer 4 back into layer 2, `--check` proves layer 4 rebuilds them exactly  |
 | `tools.repack.repack_2_lz4`      | `workspace/unpacked/1-bpak/`       | Brings the entries edited in layer 2 back into layer 1, recompressed                                     |
 | `tools.repack.repack_3_bpak`     | `workspace/repacked/`              | Rebuilds the paks from layer 1 and checks they're byte-identical to the game's                           |
@@ -138,10 +139,20 @@ size of its albedo. The size and the mipmap count are free:
 .venv/Scripts/python -m tools.patch_paks --pak Resources
 ```
 
-The shared code sits next to the scripts: `tools/bpak.py` (the archive format), `tools/load_trace.py` (the load
-trace format), `tools/formats/` (the entry formats: textures, DDS, TGA), `tools/paths.py` (every location),
-`tools/constants.py` (every other constant) and `tools/utils.py` (helpers). The scripts follow Pylint, configured in
-`pyproject.toml` (`.venv/Scripts/python -m pylint tools`), and python-lz4 gets its types from the stubs in `typings/`.
+The original edition's BIG file unpacks in one step, from any build. Its files are named after their keys, as a
+mod's `bf/` folder holds them, and `index.json` gives the name and folder of every key (the folders of the GOG build
+are lost, only the names are left). `--filter` takes a glob pattern on the keys, names and paths:
+```bash
+.venv/Scripts/python -m tools.unpack.unpack_big "<game folder>/sally_clean.bf" --name steam
+.venv/Scripts/python -m tools.unpack.unpack_big "<game folder>/sally_clean.bf" --name gog --filter "*.txg"
+```
+
+The shared code sits next to the scripts: `tools/bpak.py` and `tools/big.py` (the archive formats),
+`tools/load_trace.py` (the load trace format), `tools/formats/` (the entry formats: textures, DDS, TGA),
+`tools/paths.py` (every location), `tools/constants.py` (every other constant) and `tools/utils.py` (helpers). The
+scripts follow Pylint, configured in `pyproject.toml` (`.venv/Scripts/python -m pylint tools`), and python-lz4 gets
+its types from the stubs in `typings/`. The LZO blocks of the BIG file are decompressed with
+[lzallright](https://github.com/vlaci/lzallright) (MIT).
 
 ## License
 Released under the [MIT License](LICENSE).

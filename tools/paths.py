@@ -97,6 +97,9 @@ IDENTIFIED_LAYER_DIR = UNPACKED_DIR / "3-identified"
 # Layer 4: the entries of layer 3 converted to common formats (textures to DDS, ...)
 CONVERTED_LAYER_DIR = UNPACKED_DIR / "4-converted"
 
+# The BIG files of the original edition unpacked by "tools.unpack.unpack_big", one folder per build
+BIG_UNPACKED_DIR = UNPACKED_DIR / "big"
+
 # The paks rebuilt from layer 1, to check it holds everything or to install them in the game
 REPACKED_DIR = WORKSPACE_DIR / "repacked"
 

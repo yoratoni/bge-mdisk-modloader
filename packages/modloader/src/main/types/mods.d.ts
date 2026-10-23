@@ -1,4 +1,4 @@
-import type { GameEdition } from "@/main/types/games"
+import type { GameEdition, OriginalBuild } from "@/main/types/games"
 
 /**
  * The description of a mod, its "mod.json".
@@ -23,19 +23,14 @@ export type ModManifest = {
      * What the mod changes, empty when not given.
      */
     description: string
-
-    /**
-     * The edition the mod is made for.
-     */
-    edition: GameEdition
 }
 
 /**
- * The entries a mod replaces in one pak.
+ * The entries a mod replaces in one archive of the game.
  */
-export type ModPak = {
+export type ModArchive = {
     /**
-     * The pak name, without extension (e.g. "Resources").
+     * The file name of the archive: a pak (e.g. "Resources.pak"), or the BIG file of the original edition.
      */
     name: string
 
@@ -43,6 +38,26 @@ export type ModPak = {
      * The number of entries the mod replaces in it.
      */
     entryCount: number
+}
+
+/**
+ * The part of a mod for one edition of the game, or for one build of the original edition.
+ */
+export type ModPart = {
+    /**
+     * The edition the part applies to.
+     */
+    edition: GameEdition
+
+    /**
+     * The build of the original edition the part is made for, `null` when it suits every build of its edition.
+     */
+    build: OriginalBuild | null
+
+    /**
+     * The archives it changes.
+     */
+    archives: ModArchive[]
 }
 
 /**
@@ -60,9 +75,9 @@ export type Mod = ModManifest & {
     isEnabled: boolean
 
     /**
-     * The paks the mod changes.
+     * Its parts, an install getting the ones of its edition and build.
      */
-    paks: ModPak[]
+    parts: ModPart[]
 }
 
 /**
@@ -73,18 +88,18 @@ export type AddModResult =
     | { ok: false; reason: "canceled" | "invalid" | "already-installed"; details?: string }
 
 /**
- * What applying the mods changed in the paks of the picked install.
+ * What applying the mods changed in the archives of the picked install.
  */
 export type ApplyModsResult = {
     /**
-     * The paks patched, with the number of entries replaced in each.
+     * The archives patched, with the number of entries replaced in each.
      */
-    patchedPaks: ModPak[]
+    patchedArchives: ModArchive[]
 
     /**
-     * The paks put back to their original, no enabled mod changing them anymore.
+     * The archives put back to their original, no enabled mod changing them anymore.
      */
-    restoredPaks: string[]
+    restoredArchives: string[]
 }
 
 /**
@@ -92,7 +107,7 @@ export type ApplyModsResult = {
  */
 export type RestoreGameResult = {
     /**
-     * The paks put back to their original.
+     * The archives put back to their original.
      */
-    restoredPaks: string[]
+    restoredArchives: string[]
 }

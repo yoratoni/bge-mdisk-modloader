@@ -1,6 +1,6 @@
 # MDisk Mod Loader
 The desktop app of the BG&E MDISK Mod Loader: it finds the installs of Beyond Good & Evil, installs mods and applies
-them to the 20th Anniversary Edition (not to the original edition yet).
+them to the 20th Anniversary Edition or to the original edition.
 
 Built with [Electron](https://www.electronjs.org/) and [electron-vite](https://electron-vite.org/), React and
 Tailwind CSS for the interface, Biome and [Nitpicker](https://www.npmjs.com/package/@alien_intelligence/eslint-plugin-nitpicker)
@@ -14,29 +14,49 @@ Edition, `sally_clean.bf` for the original):
 - **By hand**: any folder the user picks.
 
 ## Mods
-A mod is a folder holding a `mod.json` and the new content of the entries it replaces, named as the unpacked layer 2
-of the repository's tools names them (a key as 8 hex digits, or the entry's name):
+A mod is a folder holding a `mod.json` and the new content of the files it replaces, in one folder per edition it
+supports. A mod can hold both, an install gets the part of its own edition:
 ```text
 my-mod/
-  mod.json              {"name": "...", "version": "...", "author": "...", "description": "...", "edition": "anniversary"}
-  paks/
+  mod.json              {"name": "...", "version": "...", "author": "...", "description": "..."}
+  paks/                 the part for the 20th Anniversary Edition
     Resources/
-      09001331          the new content of entry 0x09001331, as layer 2 holds it (decompressed)
+      09001331          the new content of entry 0x09001331, as layer 2 of the tools holds it (decompressed)
       09001331.extra    optional, its new extra bytes (the original ones are kept otherwise)
+  bf/                   the part for the original edition
+    61000001            the new content of file 0x61000001 of sally_clean.bf, for every build
+    gog/
+      fd10631a          the new content of file 0xFD10631A, for the GOG build only
+    steam/
+      fd10631a          the same file, for the Steam build only
 ```
 
-Applying the enabled mods patches the paks of the picked install in place, the way `tools.patch_paks` does: the
-replaced entries (stored raw) and a new table of contents are appended after the original bytes, which stay untouched.
-Each pak starts again from its original, a later mod wins over an earlier one replacing the same entry, and "Restore
-the game" cuts every pak back to its original. A pak's original size, header and table CRC are recorded before it's
-touched, the paks of a game updated or verified by Steam since are taken as new originals.
+The files are named the way the repository's tools name them: in `paks/`, a key as 8 hex digits or the entry's name,
+in `bf/`, always the key, as `tools.unpack.unpack_big` writes them. A file of the original edition is replaced whole.
+The Steam build (a 2019 rebuild) and the GOG build (the 2003 data) share most files, but the worlds and their text
+differ, so these go in the folder of the build they're made from. On a build, the files for every build apply first,
+then the files of its folder.
+
+The app tells the builds apart from the file and folder counts of their BIG file's header, which a patch never
+changes, and shows the build of every original install. A mod with nothing for the picked edition and build gets a
+warning, and is skipped when the mods are applied. An unknown build only gets the files for every build.
+
+Applying the enabled mods patches the archives of the picked install in place, the way `tools.patch_paks` does. In a
+pak, the replaced entries (stored raw) and a new table of contents are appended after the original bytes, which stay
+untouched. In `sally_clean.bf`, the replaced files are appended after the original bytes, and the file table and
+file records are rewritten to point at them (see the research notes).
+
+Each archive starts again from its original, a later mod wins over an earlier one replacing the same file, and
+"Restore the game" cuts every archive back to its original. What's needed to restore an archive is recorded before
+it's touched: a pak's original size, header and table CRC, and the BIG file's original size, fingerprints and file
+tables. An archive updated or verified by Steam since is taken as a new original.
 
 What the app keeps, in the `mdisk-modloader` folder of the user's application data:
-| Path                           | Content                                                          |
-|--------------------------------|------------------------------------------------------------------|
-| `config.json`                  | The picked install, the installs added by hand, the enabled mods |
-| `mods/<mod>/`                  | The installed mods, copied from the folder they were added from  |
-| `patches/<install>/<pak>.json` | The original state of every pak the app patched, per install     |
+| Path                               | Content                                                                    |
+|------------------------------------|----------------------------------------------------------------------------|
+| `config.json`                      | The picked install, the installs added by hand, the enabled mods           |
+| `mods/<mod>/`                      | The installed mods, copied from the folder they were added from            |
+| `patches/<install>/<archive>.json` | The original state of every archive the app patched (`Resources.pak.json`) |
 
 ## Development
 Requirements:

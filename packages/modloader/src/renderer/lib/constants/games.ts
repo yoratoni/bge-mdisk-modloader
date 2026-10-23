@@ -1,4 +1,4 @@
-import type { GameEdition, GameSource } from "@/main/types/games"
+import type { GameEdition, GameSource, OriginalBuild } from "@/main/types/games"
 
 /**
  * All constants related to showing the installs of the game.
@@ -11,6 +11,19 @@ const GAMES_UI_CONSTANTS = {
         anniversary: "20th Anniversary Edition",
         original: "Original (2003)",
     } as Record<GameEdition, string>,
+
+    /**
+     * The display name of every known build of the original edition.
+     */
+    buildNames: {
+        steam: "Steam",
+        gog: "GOG",
+    } as Record<OriginalBuild, string>,
+
+    /**
+     * The display name of a build of the original edition the mod loader doesn't know.
+     */
+    unknownBuildName: "unknown build",
 
     /**
      * The display name of every place an install can come from.

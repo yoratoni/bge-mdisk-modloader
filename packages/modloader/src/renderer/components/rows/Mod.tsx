@@ -1,19 +1,21 @@
+import { cn } from "@cybearl/cypack/frontend"
+import ArchiveList from "@renderer/components/texts/ArchiveList"
+import Badge from "@renderer/components/ui/Badge"
 import { Button } from "@renderer/components/ui/Button"
 import { Switch } from "@renderer/components/ui/Switch"
-import GAMES_UI_CONSTANTS from "@renderer/lib/constants/games"
-import { describePaks } from "@renderer/lib/utils/mods"
-import { Trash2Icon } from "lucide-react"
-import type { GameEdition } from "@/main/types/games"
+import { describeGameTarget, describePartTarget, isPartForGame } from "@renderer/lib/utils/mods"
+import { Trash2Icon, TriangleAlertIcon } from "lucide-react"
+import type { Game } from "@/main/types/games"
 import type { Mod } from "@/main/types/mods"
 
 type ModRowProps = {
     mod: Mod
-    gameEdition: GameEdition
+    game: Game
     onToggle: (id: string, isEnabled: boolean) => Promise<void>
     onRemove: (id: string) => Promise<void>
 }
 
-export default function ModRow({ mod, gameEdition, onToggle, onRemove }: ModRowProps) {
+export default function ModRow({ mod, game, onToggle, onRemove }: ModRowProps) {
     return (
         <div className="flex items-start gap-4 border-b border-border px-4 py-3">
             <Switch
@@ -32,11 +34,27 @@ export default function ModRow({ mod, gameEdition, onToggle, onRemove }: ModRowP
 
                 {mod.description && <p className="text-sm text-muted-foreground">{mod.description}</p>}
 
-                <p className="text-xs text-muted-foreground">{describePaks(mod.paks)}</p>
+                {mod.parts.map(part => (
+                    <div
+                        key={`${part.edition}-${part.build}`}
+                        className={cn(
+                            "flex items-center gap-2 text-xs text-muted-foreground",
+                            !isPartForGame(part, game) && "opacity-50",
+                        )}
+                    >
+                        <Badge>{describePartTarget(part)}</Badge>
+                        <span>
+                            Replaces <ArchiveList archives={part.archives} />
+                        </span>
+                    </div>
+                ))}
 
-                {mod.edition !== gameEdition && (
-                    <p className="text-xs text-warning">
-                        Made for the {GAMES_UI_CONSTANTS.editionNames[mod.edition]}, skipped on this install
+                {!mod.parts.some(part => isPartForGame(part, game)) && (
+                    <p className="flex items-center gap-1.5 text-xs text-warning">
+                        <TriangleAlertIcon className="size-3.5 shrink-0" />
+                        <span className="pb-1">
+                            Nothing for the {describeGameTarget(game)}, skipped on this install
+                        </span>
                     </p>
                 )}
             </div>

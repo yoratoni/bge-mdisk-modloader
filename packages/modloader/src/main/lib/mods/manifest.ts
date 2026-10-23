@@ -1,8 +1,29 @@
 import { readdir, readFile } from "node:fs/promises"
 import path from "node:path"
+import BIG_CONSTANTS from "@main/lib/constants/big"
 import MODS_CONSTANTS from "@main/lib/constants/mods"
-import type { GameEdition } from "@/main/types/games"
-import type { Mod, ModManifest, ModPak } from "@/main/types/mods"
+import type { OriginalBuild } from "@/main/types/games"
+import type { Mod, ModManifest, ModPart } from "@/main/types/mods"
+
+/**
+ * The files a mod replaces in the BIG file, for every build or for one.
+ */
+export type ModBigFiles = {
+    /**
+     * The build they're made for, `null` for every build.
+     */
+    build: OriginalBuild | null
+
+    /**
+     * The folder holding them.
+     */
+    dir: string
+
+    /**
+     * The file names, each one a key.
+     */
+    files: string[]
+}
 
 /**
  * Validates the content of a "mod.json".
@@ -19,11 +40,6 @@ function parseManifest(value: unknown): ModManifest {
         throw new Error(`${MODS_CONSTANTS.manifestFileName} has no "name".`)
     }
 
-    if (!MODS_CONSTANTS.editions.includes(manifest.edition as GameEdition)) {
-        const editions = MODS_CONSTANTS.editions.join('" or "')
-        throw new Error(`${MODS_CONSTANTS.manifestFileName} has no "edition" ("${editions}").`)
-    }
-
     /**
      * Reads an optional text field.
      * @param field The field.
@@ -36,13 +52,28 @@ function parseManifest(value: unknown): ModManifest {
         version: readText("version"),
         author: readText("author"),
         description: readText("description"),
-        edition: manifest.edition as GameEdition,
+    }
+}
+
+/**
+ * Lists the files or the folders of a folder.
+ * @param dir The folder.
+ * @param isDirectory Whether to list the folders instead of the files.
+ * @returns Their names, none when the folder doesn't exist.
+ */
+async function listChildren(dir: string, isDirectory: boolean): Promise<string[]> {
+    try {
+        return (await readdir(dir, { withFileTypes: true }))
+            .filter(child => (isDirectory ? child.isDirectory() : child.isFile()))
+            .map(child => child.name)
+    } catch {
+        return []
     }
 }
 
 /**
  * Returns the name of the entry a file of a mod replaces, keys lowercase like the unpacked layers name them.
- * @param fileName The file name, in a pak folder of the mod.
+ * @param fileName The file name, in a pak folder or the BIG folder of the mod.
  * @returns The entry name.
  */
 export function getReplacedEntryName(fileName: string): string {
@@ -52,25 +83,16 @@ export function getReplacedEntryName(fileName: string): string {
 /**
  * Lists the entries a mod replaces in each pak.
  * @param modDir The folder of the mod.
- * @returns The files replacing entries, by pak name (the extra bytes files left out, they follow their entry).
+ * @returns The files replacing entries, by pak folder name (the extra bytes files left out, they follow their entry).
  */
 export async function listModEntries(modDir: string): Promise<Map<string, string[]>> {
     const paksDir = path.join(modDir, MODS_CONSTANTS.paksDirName)
     const entries = new Map<string, string[]>()
-    let pakDirs: string[]
 
-    try {
-        pakDirs = (await readdir(paksDir, { withFileTypes: true }))
-            .filter(dir => dir.isDirectory())
-            .map(dir => dir.name)
-    } catch {
-        return entries
-    }
-
-    for (const pakName of pakDirs) {
-        const files = (await readdir(path.join(paksDir, pakName), { withFileTypes: true }))
-            .filter(file => file.isFile() && !file.name.endsWith(MODS_CONSTANTS.extraSuffix))
-            .map(file => file.name)
+    for (const pakName of await listChildren(paksDir, true)) {
+        const files = (await listChildren(path.join(paksDir, pakName), false)).filter(
+            file => !file.endsWith(MODS_CONSTANTS.extraSuffix),
+        )
 
         if (files.length) entries.set(pakName, files)
     }
@@ -79,7 +101,50 @@ export async function listModEntries(modDir: string): Promise<Map<string, string
 }
 
 /**
- * Reads a mod from its folder.
+ * Lists the files a mod replaces in the BIG file of the original edition, the ones for every build first.
+ * @param modDir The folder of the mod.
+ * @returns The files, for every build and by build, each one named after a key.
+ */
+export async function listModBigEntries(modDir: string): Promise<ModBigFiles[]> {
+    const bigDir = path.join(modDir, MODS_CONSTANTS.bigDirName)
+    const groups: ModBigFiles[] = [
+        {
+            build: null,
+            dir: bigDir,
+            files: await listChildren(bigDir, false),
+        },
+    ]
+
+    for (const buildDirName of await listChildren(bigDir, true)) {
+        const knownBuild = BIG_CONSTANTS.builds.find(build => build.build === buildDirName.toLowerCase())
+
+        if (!knownBuild) {
+            const buildNames = BIG_CONSTANTS.builds.map(build => build.build).join(", ")
+            throw new Error(`"${MODS_CONSTANTS.bigDirName}/${buildDirName}" isn't a known build (${buildNames}).`)
+        }
+
+        const buildDir = path.join(bigDir, buildDirName)
+        groups.push({
+            build: knownBuild.build,
+            dir: buildDir,
+            files: await listChildren(buildDir, false),
+        })
+    }
+
+    for (const group of groups) {
+        const unnamedFile = group.files.find(file => !MODS_CONSTANTS.keyFileNamePattern.test(file))
+
+        if (unnamedFile) {
+            const filePath = [MODS_CONSTANTS.bigDirName, group.build, unnamedFile].filter(Boolean).join("/")
+            throw new Error(`"${filePath}" isn't named after a key (8 hex digits).`)
+        }
+    }
+
+    return groups.filter(group => group.files.length)
+}
+
+/**
+ * Reads a mod from its folder, its parts told from the folders it holds.
  * @param modDir The folder of the mod.
  * @param id The name the mod is known by, its folder name in the mods folder.
  * @param isEnabled Whether the mod is enabled.
@@ -95,17 +160,37 @@ export async function readMod(modDir: string, id: string, isEnabled: boolean): P
     }
 
     const manifest = parseManifest(manifestJson)
-    const paks: ModPak[] = [...(await listModEntries(modDir))].map(([name, files]) => ({
-        name,
-        entryCount: files.length,
-    }))
+    const pakEntries = await listModEntries(modDir)
+    const parts: ModPart[] = []
 
-    if (!paks.length) throw new Error(`The mod replaces no entry, its "${MODS_CONSTANTS.paksDirName}" folder is empty.`)
+    if (pakEntries.size) {
+        parts.push({
+            edition: "anniversary",
+            build: null,
+            archives: [...pakEntries].map(([pakName, files]) => ({
+                name: `${pakName}${MODS_CONSTANTS.pakExtension}`,
+                entryCount: files.length,
+            })),
+        })
+    }
+
+    for (const group of await listModBigEntries(modDir)) {
+        parts.push({
+            edition: "original",
+            build: group.build,
+            archives: [{ name: BIG_CONSTANTS.fileName, entryCount: group.files.length }],
+        })
+    }
+
+    if (!parts.length) {
+        const dirNames = `"${MODS_CONSTANTS.paksDirName}" or "${MODS_CONSTANTS.bigDirName}"`
+        throw new Error(`The mod replaces nothing, it has no ${dirNames} folder holding files.`)
+    }
 
     return {
         ...manifest,
         id,
         isEnabled,
-        paks,
+        parts,
     }
 }

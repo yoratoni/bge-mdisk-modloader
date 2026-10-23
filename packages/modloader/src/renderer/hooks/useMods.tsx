@@ -1,7 +1,7 @@
+import ArchiveList from "@renderer/components/texts/ArchiveList"
 import toast from "@renderer/components/ui/Toast"
 import MODS_UI_CONSTANTS from "@renderer/lib/constants/mods"
 import { convertErrorToMessage } from "@renderer/lib/utils/errors"
-import { describePaks } from "@renderer/lib/utils/mods"
 import { useCallback, useEffect, useState } from "react"
 import type { Mod } from "@/main/types/mods"
 
@@ -78,13 +78,27 @@ export default function useMods() {
     const apply = useCallback(async () => {
         try {
             const result = await window.api.mods.apply()
-            const changes = [
-                result.patchedPaks.length ? `Patched ${describePaks(result.patchedPaks)}` : "",
-                result.restoredPaks.length ? `Put back ${result.restoredPaks.join(", ")}` : "",
-            ].filter(Boolean)
 
-            if (changes.length) toast.success(MODS_UI_CONSTANTS.messages.applied, changes.join(", "))
-            else toast.info(MODS_UI_CONSTANTS.messages.nothingToApply)
+            if (!result.patchedArchives.length && !result.restoredArchives.length) {
+                toast.info(MODS_UI_CONSTANTS.messages.nothingToApply)
+                return
+            }
+
+            toast.success(
+                MODS_UI_CONSTANTS.messages.applied,
+                <>
+                    {result.patchedArchives.length > 0 && (
+                        <span>
+                            Replaced <ArchiveList archives={result.patchedArchives} />.{" "}
+                        </span>
+                    )}
+                    {result.restoredArchives.length > 0 && (
+                        <span>
+                            Put back <ArchiveList archives={result.restoredArchives} />.
+                        </span>
+                    )}
+                </>,
+            )
         } catch (error) {
             toast.error(MODS_UI_CONSTANTS.messages.applyFailed, convertErrorToMessage(error))
         }
@@ -97,8 +111,13 @@ export default function useMods() {
         try {
             const result = await window.api.mods.restore()
 
-            if (result.restoredPaks.length) {
-                toast.success(MODS_UI_CONSTANTS.messages.restored, `Put back ${result.restoredPaks.join(", ")}`)
+            if (result.restoredArchives.length) {
+                toast.success(
+                    MODS_UI_CONSTANTS.messages.restored,
+                    <>
+                        Put back <ArchiveList archives={result.restoredArchives} />.
+                    </>,
+                )
             } else {
                 toast.info(MODS_UI_CONSTANTS.messages.nothingToRestore)
             }

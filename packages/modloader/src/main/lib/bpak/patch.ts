@@ -10,6 +10,7 @@ import {
     serializeTable,
 } from "@main/lib/bpak/format"
 import BPAK_CONSTANTS from "@main/lib/constants/bpak"
+import { readFileRange } from "@main/lib/utils/fs"
 import type { PakEntry, PakHeader, PatchRecord } from "@/main/types/bpak"
 
 /**
@@ -37,22 +38,6 @@ export type OriginalPak = {
 }
 
 /**
- * Reads a range of an open file.
- * @param handle The open file.
- * @param position The position of the range.
- * @param size The size of the range.
- * @returns The bytes of the range.
- */
-async function readRange(handle: FileHandle, position: number, size: number): Promise<Buffer> {
-    const data = Buffer.alloc(size)
-    const { bytesRead } = await handle.read(data, 0, size, position)
-
-    if (bytesRead !== size) throw new Error("The pak ends before the range read.")
-
-    return data
-}
-
-/**
  * Checks that a pak still holds the original bytes a record describes, its original table of contents where it was.
  * @param handle The open pak.
  * @param fileSize The current size of the pak.
@@ -63,7 +48,7 @@ async function hasOriginalBytes(handle: FileHandle, fileSize: number, record: Pa
     if (fileSize < record.originalSize) return false
 
     const { tableSize } = parseHeader(Buffer.from(record.originalHeader, "hex"))
-    const table = await readRange(handle, record.originalSize - tableSize, tableSize)
+    const table = await readFileRange(handle, record.originalSize - tableSize, tableSize)
 
     return crc32(table) === record.originalTableCrc32
 }
@@ -85,9 +70,9 @@ export async function readOriginalPak(pakPath: string, record: PatchRecord | nul
         let originalRecord = record && (await hasOriginalBytes(handle, fileSize, record)) ? record : null
 
         if (!originalRecord) {
-            const header = await readRange(handle, 0, BPAK_CONSTANTS.headerSize)
+            const header = await readFileRange(handle, 0, BPAK_CONSTANTS.headerSize)
             const { tableSize } = parseHeader(header)
-            const table = await readRange(handle, fileSize - tableSize, tableSize)
+            const table = await readFileRange(handle, fileSize - tableSize, tableSize)
 
             originalRecord = {
                 originalSize: fileSize,
@@ -97,7 +82,7 @@ export async function readOriginalPak(pakPath: string, record: PatchRecord | nul
         }
 
         const header = parseHeader(Buffer.from(originalRecord.originalHeader, "hex"))
-        const table = await readRange(handle, originalRecord.originalSize - header.tableSize, header.tableSize)
+        const table = await readFileRange(handle, originalRecord.originalSize - header.tableSize, header.tableSize)
 
         return {
             record: originalRecord,
@@ -155,7 +140,7 @@ export async function writePatch(
             // The original extra bytes are read from the original slot, still there after the cut
             const extra =
                 replacement.extra ??
-                (await readRange(
+                (await readFileRange(
                     handle,
                     BPAK_CONSTANTS.headerSize + entry.offset + getStoredSize(entry),
                     entry.extraSize,
