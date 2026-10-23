@@ -106,38 +106,34 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             )
         }
 
-        // Regular button handling, if the button is loading, we replace the
-        // default props with loading props, note that it takes priority
-        // over the disabled state
         if (!disableAsyncLoading && (isLoading || isLoadingInternally)) {
             props["aria-busy"] = true
             props["aria-label"] = "Loading"
             props.title = "Loading"
             props.disabled = true
 
-            // If the button is loading, we replace the children with an animated icon
             props.children = (
-                <div className="relative flex items-center justify-center">
-                    <div className="absolute inset-0 flex items-center justify-center w-full h-full">
-                        <Loader2Icon className="w-6 h-6 animate-spin" />
-                    </div>
-                    <div className="opacity-0">{props.children}</div>
-                </div>
+                <span className="grid place-items-center">
+                    <span className="invisible col-start-1 row-start-1 inline-flex items-center gap-2">
+                        {props.children}
+                    </span>
+                    <Loader2Icon className="col-start-1 row-start-1 animate-spin" />
+                </span>
             )
         }
 
-        // If the button is disabled, we keep the children as is in order to keep the same size,
-        // we simply set the opacity to 0 for the children and add the disabled text on top of it
         if ((disableAsyncLoading || (!isLoading && !isLoadingInternally)) && props.disabled && disabledText) {
             props["aria-label"] = disabledText
             props.title = disabledText
             props.disabled = true
 
             props.children = (
-                <div className="relative">
-                    <div className="opacity-0 pointer-events-none">{props.children}</div>
-                    <div className="absolute inset-0 flex items-center justify-center text-base">{disabledText}</div>
-                </div>
+                <span className="relative inline-flex">
+                    <span className="invisible pointer-events-none inline-flex items-center gap-2">
+                        {props.children}
+                    </span>
+                    <span className="absolute inset-0 flex items-center justify-center text-base">{disabledText}</span>
+                </span>
             )
         }
 
