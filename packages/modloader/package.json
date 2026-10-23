@@ -1,7 +1,7 @@
 {
     "name": "@yoratoni/mdisk-modloader",
     "version": "0.0.1",
-    "description": "The desktop app of the BG&E MDISK Mod Loader, which installs mods into Beyond Good & Evil 20th Anniversary Edition.",
+    "description": "The desktop app of the BG&E MDISK Mod Loader, which installs mods into Beyond Good & Evil, the 20th Anniversary Edition and the original.",
     "author": "yoratoni (https://github.com/yoratoni)",
     "license": "MIT",
     "private": true,

@@ -62,15 +62,18 @@ async function getSelectedGame(): Promise<Game> {
 }
 
 /**
- * Turns the error of an archive another process holds open (the game most likely) into a message saying so.
+ * Turns the error of an archive another process holds open (the game most likely), or that the app isn't allowed to
+ * write, into a message saying what to do.
  * @param error The error thrown while writing an archive.
  * @returns The error to surface.
  */
 function explainWriteError(error: unknown): Error {
     const code = (error as NodeJS.ErrnoException)?.code
 
-    if (code && (MODS_CONSTANTS.busyErrorCodes as readonly string[]).includes(code)) {
-        return new Error(MODS_CONSTANTS.messages.gameRunning)
+    if (code === MODS_CONSTANTS.busyErrorCode) return new Error(MODS_CONSTANTS.messages.gameRunning)
+
+    if (code && (MODS_CONSTANTS.deniedErrorCodes as readonly string[]).includes(code)) {
+        return new Error(MODS_CONSTANTS.messages.writeDenied)
     }
 
     return error instanceof Error ? error : new Error(String(error))

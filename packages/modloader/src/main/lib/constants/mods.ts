@@ -70,9 +70,14 @@ const MODS_CONSTANTS = {
     addDialogTitle: "Pick the folder of a mod",
 
     /**
-     * The error codes of an archive opened by another process, the game most likely.
+     * The error code of an archive opened by another process, the game most likely.
      */
-    busyErrorCodes: ["EBUSY", "EPERM", "EACCES"],
+    busyErrorCode: "EBUSY",
+
+    /**
+     * The error codes of an archive the app isn't allowed to write, in a folder only an administrator can write to.
+     */
+    deniedErrorCodes: ["EPERM", "EACCES"],
 
     /**
      * The errors surfaced to the user.
@@ -82,6 +87,9 @@ const MODS_CONSTANTS = {
         missingPak: "The game has no pak named",
         missingBig: "The game has no BIG file named",
         gameRunning: "A file of the game is in use, close the game before applying the mods.",
+        writeDenied:
+            "The files of the game can't be written. Close the game, or if it's installed in Program Files, run the " +
+            "app as administrator.",
     },
 } as const
 

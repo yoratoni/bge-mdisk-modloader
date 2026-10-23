@@ -16,6 +16,32 @@ files. The name comes from the MDisks of the game, and from Mdisk, an extract/bu
 The reverse engineering behind it (archive format, engine structures, hook sites) is documented in
 [docs/RESEARCH.md](docs/RESEARCH.md), the related projects are listed in [docs/REPOSITORIES.md](docs/REPOSITORIES.md).
 
+## Installing mods
+The mod loader app installs mods into the 20th Anniversary Edition and into the original edition (the Steam and GOG
+versions). Download it from the [latest release](https://github.com/yoratoni/bge-mdisk-modloader/releases/latest):
+`MDiskModLoader-<version>-win-x64.exe` on Windows, or the `.AppImage` on Linux (not tested yet). The installer isn't
+signed, so Windows SmartScreen may stop it the first time: "More info", then "Run anyway". The `-asi.zip` file of the
+release is the in-game toolbox for mod makers, playing mods doesn't need it.
+
+With the game closed:
+1. Open the app. It lists the installs of the game it found (Steam, GOG, Ubisoft Connect, discs), "Add a folder" adds
+   one it missed: the folder holding `BGE.exe`.
+2. Pick the install the mods go into, in the list at the top.
+3. Click "Add a mod" and pick the folder of the mod, the one holding its `mod.json` (unzip a downloaded mod first).
+   The app keeps its own copy.
+4. Switch on the mods to play with, then click "Apply". The files of the game are patched in a second.
+5. Launch the game.
+
+Switching a mod off and applying again takes it out of the game, and "Restore the game" puts every file back to its
+original (the mods stay installed). When two mods replace the same file, the one switched on last wins. A mod made
+for another edition, or for another build of the original, shows a warning and is left out. A game update or a file
+check on Steam puts the original files back, apply the mods again afterwards.
+
+An install in `Program Files` (a disc install, for instance) may need the app to run as administrator to patch it,
+the app says so when it can't write the files.
+
+How to make a mod is explained in [docs/MODDING.md](docs/MODDING.md).
+
 ## Packages
 Each package has its own build, sources, dependencies and tests:
 | Package              | Output               | Role                                                                                                                          |
@@ -56,8 +82,8 @@ cmake --preset default -DMDISK_BUILD_ASI=OFF
 ```
 
 The version is defined in the `project()` call of the root `CMakeLists.txt`, shared by every C++ package, and
-repeated in `packages/modloader/package.json` for the app. Pushing a `vX.Y.Z` tag matching it builds, tests and
-publishes the release ZIP through the GitHub workflow.
+repeated in `packages/modloader/package.json` for the app. Pushing a `vX.Y.Z` tag matching both builds, tests and
+publishes the release through the GitHub workflow: the app's installers for Windows and Linux, and the toolbox ZIP.
 
 ## Research tools
 The Python package in `tools/` copies the game files into the `workspace/` folder (ignored by git) and unpacks them

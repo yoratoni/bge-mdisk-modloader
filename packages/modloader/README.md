@@ -14,28 +14,11 @@ Edition, `sally_clean.bf` for the original):
 - **By hand**: any folder the user picks.
 
 ## Mods
-A mod is a folder holding a `mod.json` and the new content of the files it replaces, in one folder per edition it
-supports. A mod can hold both, an install gets the part of its own edition:
-```text
-my-mod/
-  mod.json              {"name": "...", "version": "...", "author": "...", "description": "..."}
-  paks/                 the part for the 20th Anniversary Edition
-    Resources/
-      09001331          the new content of entry 0x09001331, as layer 2 of the tools holds it (decompressed)
-      09001331.extra    optional, its new extra bytes (the original ones are kept otherwise)
-  bf/                   the part for the original edition
-    61000001            the new content of file 0x61000001 of sally_clean.bf, for every build
-    gog/
-      fd10631a          the new content of file 0xFD10631A, for the GOG build only
-    steam/
-      fd10631a          the same file, for the Steam build only
-```
-
-The files are named the way the repository's tools name them: in `paks/`, a key as 8 hex digits or the entry's name,
-in `bf/`, always the key, as `tools.unpack.unpack_big` writes them. A file of the original edition is replaced whole.
-The Steam build (a 2019 rebuild) and the GOG build (the 2003 data) share most files, but the worlds and their text
-differ, so these go in the folder of the build they're made from. On a build, the files for every build apply first,
-then the files of its folder.
+A mod is a folder holding a `mod.json` and the files it replaces: `paks/<pak>/` for the 20th Anniversary Edition,
+`bf/` for every build of the original edition, `bf/steam/` and `bf/gog/` for one build (the layout and how to make
+the files are in [docs/MODDING.md](../../docs/MODDING.md)). `manifest.ts` reads a mod into its parts, one per edition
+and build, and an install gets the parts of its own edition and build: on the original, the files for every build
+apply first, then the files of its build.
 
 The app tells the builds apart from the file and folder counts of their BIG file's header, which a patch never
 changes, and shows the build of every original install. A mod with nothing for the picked edition and build gets a

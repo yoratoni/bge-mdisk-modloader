@@ -1,10 +1,13 @@
-BG&E MDISK Mod Loader
-=====================
+BG&E MDISK Mod Loader, in-game toolbox
+======================================
 
-A mod loader for Beyond Good & Evil - 20th Anniversary Edition.
+The in-game part of the BG&E MDISK Mod Loader, for Beyond Good & Evil - 20th
+Anniversary Edition. It's meant for mod makers: it logs the build of the game
+it runs in and, with "TraceLoads = 1" in "MDiskModLoader.ini", records every
+file the game loads, with its type and the file that referenced it.
 
-Work in progress: this build only checks that the loader starts with the game,
-it doesn't load any mod yet.
+Playing mods doesn't need it: the mod loader app installs them, download it
+from the same release.
 
 https://github.com/yoratoni/bge-mdisk-modloader
 
@@ -29,24 +32,31 @@ On Linux (Proton), add this to the game's launch options on Steam
 
 Files
 -----
-MDiskModLoader.asi     The mod loader itself
+MDiskModLoader.asi     The toolbox itself
 MDiskModLoader.ini     Its configuration (optional, every setting has a default)
-dinput8.dll            Ultimate ASI Loader, loads the mod loader when the game starts
+dinput8.dll            Ultimate ASI Loader, loads the toolbox when the game starts
 README.txt             This file, not needed by the game
-licenses/              The licenses of the mod loader and of every component it includes
+licenses/              The licenses of the toolbox and of every component it includes
+
+Load traces
+-----------
+With "TraceLoads = 1" in the [Debug] section of "MDiskModLoader.ini", the
+toolbox writes "MDiskModLoader.loads.tsv" next to "bge.exe" while playing. The
+research tools of the repository read it to identify the game's files (see the
+README on GitHub).
 
 Uninstallation
 --------------
 Delete "MDiskModLoader.asi", "MDiskModLoader.ini", "MDiskModLoader.log",
-this "README.txt" and the "licenses" folder from the game folder. Delete
-"dinput8.dll" too, unless another mod in that folder also relies on Ultimate
-ASI Loader.
+"MDiskModLoader.loads.tsv", this "README.txt" and the "licenses" folder from
+the game folder. Delete "dinput8.dll" too, unless another mod in that folder
+also relies on Ultimate ASI Loader.
 
 Troubleshooting
 ---------------
-The mod loader writes "MDiskModLoader.log" next to "bge.exe" every time the
-game starts:
-- No log file: the mod loader wasn't loaded, check that the files are next to
+The toolbox writes "MDiskModLoader.log" next to "bge.exe" every time the game
+starts:
+- No log file: the toolbox wasn't loaded, check that the files are next to
   "bge.exe", and on Linux that the launch option above is set.
 - "Ready" at the end of the log, but something looks wrong: open an issue on
   GitHub with your log.

@@ -1,8 +1,10 @@
 name: Release
 
-# Builds the ASI in Release, runs the tests and packages a ready-to-extract ZIP
-# (ASI, configuration, Ultimate ASI Loader as dinput8.dll, a plain text README and the licenses).
-# A pushed "v*" tag also publishes the ZIP as a GitHub release, a manual run only uploads it as an artifact.
+# Builds the two downloads of a release, tested:
+# - The mod loader app: an installer for Windows and an AppImage for Linux.
+# - The in-game toolbox, a ready-to-extract ZIP (ASI, configuration, Ultimate ASI Loader as dinput8.dll, a plain text
+#   README and the licenses).
+# A pushed "v*" tag also publishes them as a GitHub release, a manual run only uploads them as artifacts.
 on:
   push:
     tags:
@@ -18,7 +20,42 @@ env:
   UAL_SHA256: e5860e7d9a1805267535b65749575b5e406cc6ea3325c7392189c578815045d1
 
 jobs:
-  release:
+  # The version is defined in the "project()" call of CMakeLists.txt and repeated in the app's package.json
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.version.outputs.value }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read the version
+        id: version
+        run: |
+          version=$(sed -nE 's/^project\(MDisk VERSION ([0-9.]+).*/\1/p' CMakeLists.txt)
+          app_version=$(node -p "require('./packages/modloader/package.json').version")
+
+          if [ -z "$version" ]; then
+              echo "::error::Couldn't read the version from CMakeLists.txt"
+              exit 1
+          fi
+
+          if [ "$app_version" != "$version" ]; then
+              echo "::error::packages/modloader/package.json is at $app_version, CMakeLists.txt at $version"
+              exit 1
+          fi
+
+          if [[ "$GITHUB_REF" == refs/tags/* ]] && [ "${GITHUB_REF_NAME#v}" != "$version" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME doesn't match the version $version"
+              exit 1
+          fi
+
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+          echo "Version: $version"
+
+  asi:
+    needs: version
     runs-on: windows-latest
 
     steps:
@@ -34,28 +71,6 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
-
-      # The version is defined once, in the "project()" call of CMakeLists.txt
-      - name: Read the version
-        id: version
-        shell: pwsh
-        run: |
-          $match = Select-String -Path CMakeLists.txt -Pattern 'project\(MDisk VERSION ([0-9.]+)'
-          if (-not $match) {
-              throw "Couldn't read the version from CMakeLists.txt"
-          }
-          $version = $match.Matches[0].Groups[1].Value
-          "value=$version" >> $env:GITHUB_OUTPUT
-          Write-Host "Version: $version"
-
-      - name: Check the tag matches the version
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: pwsh
-        run: |
-          $tagVersion = "${{ github.ref_name }}".TrimStart("v")
-          if ($tagVersion -ne "${{ steps.version.outputs.value }}") {
-              throw "Tag ${{ github.ref_name }} doesn't match the CMakeLists.txt version ${{ steps.version.outputs.value }}"
-          }
 
       # The compiler path is passed explicitly so the freshly installed LLVM is used,
       # not an older Clang that may come first in PATH
@@ -75,7 +90,7 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          $zipName = "MDiskModLoader-${{ steps.version.outputs.value }}.zip"
+          $zipName = "MDiskModLoader-${{ needs.version.outputs.value }}-asi.zip"
           New-Item -ItemType Directory -Force dist, dist/licenses, ual | Out-Null
 
           Invoke-WebRequest -Uri "https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/$env:UAL_VERSION/Ultimate-ASI-Loader-NoPDB_x64.zip" -OutFile ual/ual.zip
@@ -95,20 +110,91 @@ jobs:
           Copy-Item build-release/_deps/zydis-src/dependencies/zycore/LICENSE dist/licenses/Zycore.txt
           Copy-Item build-release/_deps/safetyhook-src/LICENSE dist/licenses/SafetyHook.txt
 
-          Compress-Archive -Path dist/* -DestinationPath $zipName
-          "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
+          New-Item -ItemType Directory -Force release | Out-Null
+          Compress-Archive -Path dist/* -DestinationPath release/$zipName
 
-      # GitHub always zips artifacts, uploading the folder (not the ZIP) keeps a single ZIP layer,
-      # the release below attaches the ZIP itself
+      # GitHub always zips artifacts, uploading the folder (not the ZIP) keeps a single ZIP layer for a manual run,
+      # the ZIP itself goes to the release
       - name: Upload the artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MDiskModLoader-${{ steps.version.outputs.value }}
+          name: MDiskModLoader-${{ needs.version.outputs.value }}-asi
           path: dist/
 
+      - name: Upload the ZIP for the release
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-asi
+          path: release/
+          if-no-files-found: error
+
+  app:
+    needs: version
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: packages/modloader
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: packages/modloader/yarn.lock
+
+      - name: Install the dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Typecheck
+        run: yarn typecheck
+
+      - name: Test
+        run: yarn vitest run
+
+      # Published by the job below, electron-builder would publish on its own when it sees a tag
+      - name: Build the installer
+        run: |
+          yarn build
+          yarn electron-builder --publish never
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-app-${{ runner.os }}
+          path: |
+            packages/modloader/dist/release/*.exe
+            packages/modloader/dist/release/*.AppImage
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [asi, app]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download the files of the release
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release
+          merge-multiple: true
+
       - name: Publish the release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.ZIP_NAME }}
+          files: release/*
           generate_release_notes: true
+          body: |
+            To install mods, download the mod loader app: `MDiskModLoader-<version>-win-x64.exe` on Windows, or the
+            `.AppImage` on Linux (Steam Deck). See the README for how to use it.
+
+            `MDiskModLoader-<version>-asi.zip` is the in-game toolbox for mod makers, playing mods doesn't need it.
