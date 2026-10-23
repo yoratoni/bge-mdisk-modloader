@@ -13,6 +13,9 @@ MDISK makes the 20th Anniversary Edition moddable, where the previous community 
 files. The name comes from the MDisks of the game, and from Mdisk, an extract/build tool for the original game's
 `sally_clean.bf` that got lost years ago.
 
+Unofficial fan project, not affiliated with or endorsed by Ubisoft. Beyond Good & Evil is a trademark of Ubisoft
+Entertainment.
+
 The reverse engineering behind it (archive format, engine structures, hook sites) is documented in
 [docs/RESEARCH.md](docs/RESEARCH.md), the related projects are listed in [docs/REPOSITORIES.md](docs/REPOSITORIES.md).
 

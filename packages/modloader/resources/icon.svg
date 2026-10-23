@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <defs>
+        <radialGradient id="disc" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0.35" stop-color="#9adfe3" />
+            <stop offset="1" stop-color="#5fb7c0" />
+        </radialGradient>
+        <linearGradient id="sheen" x1="0.15" y1="0.1" x2="0.75" y2="0.9">
+            <stop offset="0" stop-color="#ffffff" stop-opacity="0.55" />
+            <stop offset="0.45" stop-color="#ffffff" stop-opacity="0" />
+        </linearGradient>
+        <mask id="hole">
+            <rect width="512" height="512" fill="#ffffff" />
+            <circle cx="256" cy="256" r="22" fill="#000000" />
+        </mask>
+    </defs>
+
+    <g mask="url(#hole)" transform="translate(256 256) scale(1.31) translate(-256 -256)">
+        <circle cx="256" cy="256" r="180" fill="url(#disc)" />
+
+        <g fill="#ffffff" opacity="0.2">
+            <path d="M256 256 L436 256 A180 180 0 0 1 411.88 346 Z" />
+            <path d="M256 256 L346 411.88 A180 180 0 0 1 256 436 Z" />
+            <path d="M256 256 L166 411.88 A180 180 0 0 1 100.12 346 Z" />
+            <path d="M256 256 L76 256 A180 180 0 0 1 100.12 166 Z" />
+            <path d="M256 256 L166 100.12 A180 180 0 0 1 256 76 Z" />
+            <path d="M256 256 L346 100.12 A180 180 0 0 1 411.88 166 Z" />
+        </g>
+
+        <circle cx="256" cy="256" r="180" fill="url(#sheen)" />
+        <circle cx="256" cy="256" r="180" fill="none" stroke="#3f9aa3" stroke-width="6" />
+
+        <circle cx="256" cy="256" r="72" fill="#c9f1f3" opacity="0.6" />
+        <circle cx="256" cy="256" r="48" fill="#4c7480" />
+    </g>
+</svg>

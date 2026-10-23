@@ -52,6 +52,10 @@ export default function App() {
 
             <main className="relative w-full flex-1 overflow-hidden">{mainView}</main>
 
+            <footer className="shrink-0 border-t border-border px-4 py-1.5 text-xs text-muted-foreground">
+                {APP_CONFIG.disclaimer}
+            </footer>
+
             <Toaster position="bottom-right" />
         </div>
     )

@@ -3,6 +3,7 @@ import WINDOWS_CONSTANTS from "@main/lib/constants/windows"
 import WindowButton from "@renderer/components/ui/WindowButton"
 import useWindowStates from "@renderer/hooks/useWindowStates"
 import type { CSSProperties } from "react"
+import iconUrl from "../../../../resources/icon.svg"
 
 type TitleBarProps = {
     title: string
@@ -25,9 +26,12 @@ export default function TitleBar({ title }: TitleBarProps) {
             }
             onDoubleClick={() => window.api.windows.toggleMaximize()}
         >
-            <span title={title} className="truncate text-sm">
-                {title}
-            </span>
+            <div className="flex min-w-0 items-center gap-2">
+                <img src={iconUrl} alt="" className="size-4 shrink-0" />
+                <span title={title} className="truncate text-sm">
+                    {title}
+                </span>
+            </div>
 
             <div className="flex h-full" style={{ WebkitAppRegion: "no-drag" } as CSSProperties}>
                 <WindowButton variant="minimize" onClick={() => window.api.windows.minimize()} />
